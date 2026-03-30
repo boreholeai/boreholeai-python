@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://pypi.org/project/boreholeai/"><img src="https://img.shields.io/pypi/v/boreholeai?label=pypi&color=blue" alt="PyPI"></a>
   <a href="https://pypi.org/project/boreholeai/"><img src="https://img.shields.io/pypi/pyversions/boreholeai" alt="Python"></a>
-  <a href="https://github.com/Quin-L/boreholeai-python/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="License"></a>
+  <a href="https://github.com/boreholeai/boreholeai-python/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="License"></a>
 </p>
 
 <p align="center">
@@ -30,7 +30,7 @@ Upload borehole log PDFs or images, get structured ground profiles, test data, a
 
 **What others have done:** Countries like Denmark, the Netherlands, Switzerland, and the UK have recognised this problem and built centralised, publicly accessible geotechnical databases — some legislated as far back as 1926. In Australia, there is no equivalent national system. Geotechnical data is kept in isolation by individual consultancies, with no regulated or standardised approach to data collection and sharing after project completion. For more on this challenge and what other countries have achieved, see the [Churchill Trust report on geotechnical data capture](https://www.churchilltrust.com.au/project/to-develop-a-statewide-sustainable-gis-geotechnical-database-to-capture-present-data-for-the-future/).
 
-**Our approach:** We built BoreholeAI because we believe the first step toward better geotechnical data infrastructure is making it easier to get data out of the documents where it's currently trapped. BoreholeAI reads borehole log PDFs (scanned or digital) and extracts the geotechnical data — with depth and spatial awareness — into structured formats like Excel and AGS.
+**Our approach:** We built BoreholeAI because we believe that better geotechnical data infrastructure starts with making it easier to get data out of the documents where it's currently trapped. BoreholeAI reads borehole log PDFs (scanned or digital) and extracts the geotechnical data — with depth and spatial awareness — into structured formats like Excel and AGS.
 
 ## What It Does
 
@@ -176,6 +176,10 @@ For those who'd like to support the ongoing development of the project and help 
 We understand that many organisations have strict data governance requirements and cannot send documents to external services. BoreholeAI can be deployed within your own infrastructure — on-premise or in your private cloud — so that your data never leaves your environment.
 
 If this is a requirement for your team, [contact us](mailto:support@boreholeai.com) to discuss deployment options.
+
+## Disclaimer
+
+While every effort has been made to ensure accuracy and reliability, BoreholeAI is a tool to assist — not replace — professional judgement. It is the user's responsibility to verify that all extracted data is accurate and fit for their intended purpose, including compliance with applicable design specifications, standards, and regulatory requirements.
 
 ## License
 
