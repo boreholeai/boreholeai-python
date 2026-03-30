@@ -165,7 +165,7 @@ That said, borehole logs vary significantly in layout and formatting. If you fin
 
 ## Credits
 
-BoreholeAI uses a credit system (1 credit = 1 page) to cover the computational cost of running the AI models. Every new account receives free credits to get started, and additional free credits are available on request — just [get in touch](mailto:support@boreholeai.com).
+BoreholeAI uses a credit system (1 credit = 1 page) to cover the computational cost of running the AI models. Every new account (individuals) receives free credits to get started, and additional free credits are available on request — just [get in touch](mailto:support@boreholeai.com).
 
 For those who'd like to support the ongoing development of the project and help keep it running, credits can also be [purchased here](https://boreholeai.com/app/settings/plan). This is entirely optional — the goal is to make geotechnical data more accessible, and we'd rather people use the tool than not.
 
