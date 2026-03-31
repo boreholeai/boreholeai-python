@@ -55,8 +55,8 @@ class APIClient:
                 )
                 client.get("/health")
                 self._client = client
-                if i > 0:
-                    print(f"  Connected to fallback server", file=sys.stderr, flush=True)
+                server_tag = url.split("//")[1].split(".")[0]  # e.g. "api1"
+                print(f"  [{server_tag}]", file=sys.stderr, flush=True)
                 return self._client
             except (httpx.ConnectError, httpx.ConnectTimeout):
                 if i < len(self._urls) - 1:
