@@ -24,7 +24,7 @@ Upload borehole log PDFs or images, get structured ground profiles, test data, a
 
 ## Background
 
-**The problem:** Geotechnical engineers routinely extract data from borehole log PDFs by hand — reading material descriptions, depths, test results, and keying them into spreadsheets or AGS files. On a typical project with dozens of logs, this takes days. On larger projects, it can take weeks.
+**The problem:** Geotechnical engineers routinely extract data from borehole log PDFs manually — reading material descriptions, depths, test results, and keying them into spreadsheets or AGS files. On a typical project with dozens of logs, this takes days. On larger projects, it can take weeks.
 
 **Why it matters:** This matters beyond individual project efficiency. Globally, millions of dollars are spent each year on new ground investigations to understand subsurface conditions — but much of this work has already been done before. Valuable geological and geotechnical records from past projects sit in libraries as old hard copies, in consultancy archives, or on digital platforms that aren't searchable or interoperable. Over time, these reports get misplaced, disposed of, or locked behind organisational boundaries. When that happens, the cycle of discovery starts again from scratch.
 
@@ -36,7 +36,7 @@ Upload borehole log PDFs or images, get structured ground profiles, test data, a
 
 **Extracts:**
 - Ground profile — material descriptions, depths, geology, consistency/density
-- Test data — SPT, UCS, Is50, groundwater levels
+- Test data — SPT, UCS, Is50, PP, groundwater levels
 - Borehole metadata — hole ID, location, dates, drilling method
 
 **Outputs:**
@@ -142,11 +142,11 @@ class FileResult:
 
 ## Accuracy
 
-BoreholeAI uses a sophisticated multi-agent, multi-stage agentic system that combines engineering deterministic algorithms, customized deep learning models, and computer vision with AI-assisted document understanding. Your documents are never read directly by AI models — we apply an OCR intermediary layer so that AI only works with extracted text and layout information, never with your original files. The structured output is driven by spatial reasoning and rule-based logic, not generative models.
+BoreholeAI uses a sophisticated multi-agent, multi-stage agentic system that combines engineering deterministic algorithms, customized deep learning models, and computer vision with AI-assisted document understanding. Your documents are never read directly by AI models — we apply an OCR intermediary layer so that AI only works with extracted text and layout information, never with your original files and hence ensuring data security. The structured output is driven by spatial reasoning and rule-based logic, not generative models.
 
 The system handles complex layouts, varying scales, multi-page logs, and inconsistent formatting.
 
-We have tested extensively across a wide range of borehole log formats and consistently achieve 95-100% accuracy. We are grateful to the [Queensland Geotechnical Database (QGD)](https://www.qgd.com) for making their data openly available — their collection of real-world borehole logs has been invaluable for testing and validating the system.
+We have tested extensively across a wide range of publicly available borehole log formats and consistently achieve 95-100% accuracy. We are grateful to the [Queensland Geotechnical Database (QGD)](https://www.qgd.com) for making their data publicly available — their collection of real-world borehole logs has been invaluable for testing and validating the system.
 
 That said, borehole logs vary significantly in layout and formatting. If you find an inaccuracy or an extraction issue, please [let us know](mailto:support@boreholeai.com) — every report helps us improve the system.
 
