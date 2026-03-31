@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 
+from boreholeai._version import __version__
 from boreholeai.exceptions import (
     AuthenticationError,
     BoreholeAIError,
@@ -108,8 +109,30 @@ class APIClient:
 # Internal Helper Functions
 # -------------------------------------------
 
+_update_warned = False
+
+
+def _check_sdk_version(resp: httpx.Response) -> None:
+    """Warn once if the server reports a newer SDK version."""
+    global _update_warned
+    if _update_warned:
+        return
+    try:
+        latest = resp.headers.get("X-SDK-Latest-Version")
+        if latest and latest != __version__:
+            _update_warned = True
+            print(
+                f"  Update available: boreholeai {latest} (you have {__version__}). "
+                f"Run: pip install -U boreholeai",
+                file=sys.stderr,
+            )
+    except Exception:
+        pass
+
+
 def _raise_for_status(resp: httpx.Response) -> None:
     """Convert HTTP errors to SDK exceptions."""
+    _check_sdk_version(resp)
     if resp.is_success:
         return
 
