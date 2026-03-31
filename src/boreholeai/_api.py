@@ -53,7 +53,10 @@ class APIClient:
                     headers=self._auth_headers,
                     timeout=httpx.Timeout(self._timeout, connect=CONNECT_TIMEOUT),
                 )
-                client.get("/health")
+                health = client.get("/health")
+                if health.status_code >= 500:
+                    client.close()
+                    raise httpx.ConnectError(f"{url} returned {health.status_code}")
                 self._client = client
                 server_tag = url.split("//")[1].split(".")[0]  # e.g. "api1"
                 print(f"  [{server_tag}]", file=sys.stderr, flush=True)
