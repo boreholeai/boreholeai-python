@@ -60,6 +60,7 @@ pip install boreholeai
 ```python
 from boreholeai import BoreholeAI
 
+# Get your API key at: https://boreholeai.com/app/settings/api-keys
 client = BoreholeAI(api_key="bhai_your_api_key_here")
 
 # Process a single borehole log
