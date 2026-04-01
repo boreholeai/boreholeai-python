@@ -28,5 +28,7 @@ Homepage = "https://boreholeai.com"
 Documentation = "https://boreholeai.com/docs"
 Repository = "https://github.com/boreholeai/boreholeai-python"
 
+[tool.hatch.build.hooks.custom]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/boreholeai"]

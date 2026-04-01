@@ -36,7 +36,10 @@ class APIClient:
     """
 
     def __init__(self, api_key: str, base_url: str, timeout: float):
-        self._auth_headers = {"Authorization": f"Bearer {api_key}"}
+        self._auth_headers: dict[str, str] = {"Authorization": f"Bearer {api_key}"}
+        tz = _detect_local_timezone()
+        if tz:
+            self._auth_headers["X-Timezone"] = tz
         self._timeout = timeout
         self._urls = [base_url] if base_url not in DEFAULT_URLS else DEFAULT_URLS
         self._client: httpx.Client | None = None
@@ -111,6 +114,28 @@ class APIClient:
 # -------------------------------------------
 # Internal Helper Functions
 # -------------------------------------------
+
+def _detect_local_timezone() -> str:
+    """Best-effort detection of the local IANA timezone name (e.g. 'Australia/Brisbane').
+
+    Reads the /etc/localtime symlink on macOS/Linux. Falls back to TZ env var.
+    Returns empty string if detection fails — server will use its configured default.
+    """
+    import os
+    # 1. Explicit TZ env var (works on all platforms)
+    tz = os.environ.get("TZ", "")
+    if tz and "/" in tz:
+        return tz
+    # 2. /etc/localtime symlink (macOS and most Linux)
+    try:
+        link = os.readlink("/etc/localtime")
+        for marker in ("/zoneinfo/", "/zoneinfo-icu/"):
+            if marker in link:
+                return link.split(marker, 1)[1]
+    except (OSError, ValueError):
+        pass
+    return ""
+
 
 _update_warned = False
 

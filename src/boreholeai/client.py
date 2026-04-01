@@ -8,6 +8,7 @@ from pathlib import Path
 
 from boreholeai._api import APIClient, DEFAULT_BASE_URL, DEFAULT_TIMEOUT
 from boreholeai._files import collect_files
+from boreholeai._version import __version__, __version_date__
 from boreholeai._types import FileResult, JobResult
 from boreholeai.exceptions import JobFailedError
 
@@ -48,6 +49,9 @@ class BoreholeAI:
     ):
         if not api_key:
             raise ValueError("api_key is required")
+        date_suffix = f" ({__version_date__})" if __version_date__ != "dev" else ""
+        _log(f"boreholeai v{__version__}{date_suffix}")
+        _log("To check for updates: pip install --upgrade boreholeai")
         self._api = APIClient(api_key=api_key, base_url=base_url, timeout=timeout)
 
     def close(self) -> None:
