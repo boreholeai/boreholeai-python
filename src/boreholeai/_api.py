@@ -43,6 +43,7 @@ class APIClient:
         self._timeout = timeout
         self._urls = [base_url] if base_url not in DEFAULT_URLS else DEFAULT_URLS
         self._client: httpx.Client | None = None
+        self.server_tag: str = ""  # set after successful connection (e.g. "api1")
 
     def _connect(self) -> httpx.Client:
         """Try each URL in order until one responds."""
@@ -61,8 +62,7 @@ class APIClient:
                     client.close()
                     raise httpx.ConnectError(f"{url} returned {health.status_code}")
                 self._client = client
-                server_tag = url.split("//")[1].split(".")[0]  # e.g. "api1"
-                print(f"  [{server_tag}]", file=sys.stderr, flush=True)
+                self.server_tag = url.split("//")[1].split(".")[0]  # e.g. "api1"
                 return self._client
             except (httpx.ConnectError, httpx.ConnectTimeout):
                 if i < len(self._urls) - 1:
@@ -168,14 +168,14 @@ def _raise_for_status(resp: httpx.Response) -> None:
     try:
         detail = resp.json().get("detail", "")
     except Exception:
-        detail = resp.text
+        pass
 
     if resp.status_code == 401:
-        raise AuthenticationError(detail or "Invalid API key", 401)
+        raise AuthenticationError("Invalid API key", 401)
     if resp.status_code == 402:
         raise InsufficientCreditsError(detail or "Insufficient credits", 402)
     if resp.status_code == 429:
-        raise RateLimitError(detail or "Rate limited", 429)
+        raise RateLimitError("Rate limited — please retry shortly", 429)
     if resp.status_code >= 500:
-        raise ServerError(detail or "Server error", resp.status_code)
-    raise BoreholeAIError(detail or f"HTTP {resp.status_code}", resp.status_code)
+        raise ServerError("Server error — please retry or contact support", resp.status_code)
+    raise BoreholeAIError(f"Request failed (HTTP {resp.status_code})", resp.status_code)

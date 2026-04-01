@@ -10,7 +10,7 @@ from boreholeai._api import APIClient, DEFAULT_BASE_URL, DEFAULT_TIMEOUT
 from boreholeai._files import collect_files
 from boreholeai._version import __version__, __version_date__
 from boreholeai._types import FileResult, JobResult
-from boreholeai.exceptions import JobFailedError
+from boreholeai.exceptions import BoreholeAIError, JobFailedError
 
 # Polling configuration
 _POLL_INITIAL_INTERVAL = 2.0   # seconds
@@ -20,8 +20,13 @@ _POLL_BACKOFF_FACTOR = 1.5
 # Default output directory
 _DEFAULT_OUTPUT_DIR = "./results"
 
-# Braille spinner frames
-_SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+# Progress bar config
+_BAR_WIDTH = 20
+_BAR_FILL = "█"
+_BAR_EMPTY = "░"
+
+# Fallback arrow spinner (if pages_total is 0 or unknown)
+_ARROW_FRAMES = ["▹▹▹▸▹", "▹▹▸▹▹", "▹▸▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸"]
 
 
 class BoreholeAI:
@@ -92,18 +97,34 @@ class BoreholeAI:
         out.mkdir(parents=True, exist_ok=True)
 
         filenames = ", ".join(f.name for f in files)
-        _log(f"Starting {filenames}")
 
-        job_data = self._api.create_job(files)
+        try:
+            job_data = self._api.create_job(files)
+        except BoreholeAIError as exc:
+            _log(f"Error: {exc}")
+            raise
+
         job_id = job_data["job_id"]
         num_pages = job_data["num_pages"]
         short_id = job_id[:8]
-        _log(f"Job {short_id} created — {num_pages} page(s)")
+        tag = f"[{self._api.server_tag}] " if self._api.server_tag else ""
+        _log(f"{tag}Starting {filenames}")
+        _log(f"{tag}Job {short_id} created — {num_pages} page(s)")
 
         # Poll
-        start = time.monotonic()
-        result = self._poll_until_done(job_id, num_pages, start)
-        elapsed = time.monotonic() - start
+        try:
+            start = time.monotonic()
+            result = self._poll_until_done(job_id, num_pages, start)
+            elapsed = time.monotonic() - start
+        except JobFailedError as exc:
+            _log(f"Error: {exc}")
+            raise
+        except BoreholeAIError as exc:
+            _log(f"Error: {exc}")
+            raise
+        except (ConnectionError, OSError) as exc:
+            _log(f"Connection lost: {exc}")
+            raise
 
         _log(f"Completed {num_pages} page(s) in {_fmt_time(elapsed)}")
 
@@ -141,13 +162,21 @@ class BoreholeAI:
             pages_done = progress.get("pages_done", 0)
             pages_total = progress.get("pages_total", num_pages)
             elapsed = time.monotonic() - start
-            spinner = _SPINNER[spin_idx % len(_SPINNER)]
             spin_idx += 1
 
-            _spinner_line(
-                f"{spinner} Processing {pages_done}/{pages_total} pages "
-                f"[{_fmt_time(elapsed)}]"
-            )
+            if pages_total > 0:
+                pct = pages_done / pages_total
+                filled = int(pct * _BAR_WIDTH)
+                bar = _BAR_FILL * filled + _BAR_EMPTY * (_BAR_WIDTH - filled)
+                _spinner_line(
+                    f"{bar} {pages_done}/{pages_total} pages "
+                    f"({int(pct * 100)}%) [{_fmt_time(elapsed)}]"
+                )
+            else:
+                arrow = _ARROW_FRAMES[spin_idx % len(_ARROW_FRAMES)]
+                _spinner_line(
+                    f"{arrow} Processing [{_fmt_time(elapsed)}]"
+                )
 
             time.sleep(interval)
             interval = min(interval * _POLL_BACKOFF_FACTOR, _POLL_MAX_INTERVAL)
