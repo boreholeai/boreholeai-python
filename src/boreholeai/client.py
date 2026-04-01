@@ -23,7 +23,7 @@ _DEFAULT_OUTPUT_DIR = "./results"
 # Progress bar config
 _BAR_WIDTH = 20
 _BAR_FILL = "█"
-_BAR_EMPTY = "░"
+_BAR_EMPTY = " "
 
 # Fallback arrow spinner (if pages_total is 0 or unknown)
 _ARROW_FRAMES = ["▹▹▹▸▹", "▹▹▸▹▹", "▹▸▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸"]
@@ -169,7 +169,7 @@ class BoreholeAI:
                 filled = int(pct * _BAR_WIDTH)
                 bar = _BAR_FILL * filled + _BAR_EMPTY * (_BAR_WIDTH - filled)
                 _spinner_line(
-                    f"{bar} {pages_done}/{pages_total} pages "
+                    f"[{bar}] {pages_done}/{pages_total} pages "
                     f"({int(pct * 100)}%) [{_fmt_time(elapsed)}]"
                 )
             else:

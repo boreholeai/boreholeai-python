@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "boreholeai"
-version = "0.2.1"
+version = "0.2.2"
 description = "Python SDK for the BoreholeAI API — digitise borehole logs programmatically"
 readme = "README.md"
 license = "Apache-2.0"
