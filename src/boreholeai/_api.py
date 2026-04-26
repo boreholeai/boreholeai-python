@@ -108,6 +108,17 @@ class APIClient:
         resp.raise_for_status()
         return resp.content
 
+    def delete_job(self, job_id: str) -> dict[str, Any]:
+        """DELETE /v1/jobs/{id} — purge all stored files for this job.
+
+        Used by the strict-retention enterprise tier (purge-on-download).
+        Idempotent — safe to call even if the job is already purged.
+        """
+        client = self._connect()
+        resp = client.delete(f"/v1/jobs/{job_id}")
+        _raise_for_status(resp)
+        return resp.json()
+
 
 
 
