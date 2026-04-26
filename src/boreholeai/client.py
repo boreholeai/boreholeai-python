@@ -182,7 +182,13 @@ class BoreholeAI:
             interval = min(interval * _POLL_BACKOFF_FACTOR, _POLL_MAX_INTERVAL)
 
     def _download_results(self, job_id: str, output_dir: Path) -> list[FileResult]:
-        """Download all result files to output_dir."""
+        """Download all result files to output_dir.
+
+        If the API key has the strict-retention flag set (server returns
+        purge_on_download=true on GET /v1/jobs/{id}/results), this method
+        calls DELETE /v1/jobs/{id} after all files are written to disk —
+        the server then purges every stored byte for this job.
+        """
         results_data = self._api.get_results(job_id)
         downloaded: list[FileResult] = []
 
@@ -198,6 +204,14 @@ class BoreholeAI:
         _log(f"Saved {len(downloaded)} file(s) to {output_dir}")
         for f in downloaded:
             _log(f"  {f.filename}")
+
+        if results_data.get("purge_on_download"):
+            purge = self._api.delete_job(job_id)
+            _log(
+                f"Purged {purge.get('files_deleted', 0)} server-side file(s) "
+                f"for job {job_id[:8]}"
+            )
+
         return downloaded
 
 
