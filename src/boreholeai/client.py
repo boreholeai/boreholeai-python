@@ -188,9 +188,16 @@ class BoreholeAI:
             for name, err in batch.failures.items():
                 _log(f"  {name}: {err}")
         if merged_files:
-            _log(f"Saved {len(merged_files)} file(s) to {output_dir}")
+            _log(f"🟢 Saved {len(merged_files)} file(s) to {output_dir}")
             for f in merged_files:
                 _log(f"  {f.filename}")
+
+        purged_count = sum(
+            1 for e in (batch.manifest.jobs.values() if batch.manifest else [])
+            if e.purged
+        )
+        if purged_count:
+            _log(f"🔴 Server files deleted for {purged_count} job(s) (enterprise purge-on-download)")
 
         # Clean up the per-job workdir only when everything succeeded.
         # On partial/failed runs we keep it so the user can inspect or resume.
