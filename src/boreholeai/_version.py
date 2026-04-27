@@ -1,2 +1,2 @@
-__version__ = "0.3.0"
-__version_date__ = "2026-04-02"  # Stamped automatically at build time by hatch_build.py
+__version__ = "0.4.0"
+__version_date__ = "2026-04-28"  # Stamped automatically at build time by hatch_build.py
