@@ -1,0 +1,105 @@
+"""Unit tests for Excel data-sheet merge + styling."""
+
+from __future__ import annotations
+
+import io
+from pathlib import Path
+
+import pytest
+from openpyxl import Workbook, load_workbook
+
+from boreholeai._merge._excel import _apply_styles, merge_excel_files
+
+
+def _write_book(tmp_path: Path, name: str, sheets: dict[str, list[list]]) -> Path:
+    wb = Workbook(); wb.remove(wb.active)
+    for sheet_name, rows in sheets.items():
+        ws = wb.create_sheet(sheet_name)
+        for row in rows:
+            ws.append(row)
+    p = tmp_path / name
+    wb.save(p)
+    return p
+
+
+def test_merge_appends_rows_skipping_header(tmp_path):
+    a = _write_book(tmp_path, "a.xlsx", {
+        "Material": [["Hole_ID", "from"], ["BH1", "0"]],
+    })
+    b = _write_book(tmp_path, "b.xlsx", {
+        "Material": [["Hole_ID", "from"], ["BH2", "0"], ["BH3", "0"]],
+    })
+
+    out = io.BytesIO(merge_excel_files([a, b]))
+    wb = load_workbook(out, data_only=True)
+    rows = list(wb["Material"].iter_rows(values_only=True))
+    assert rows[0] == ("Hole_ID", "from")  # header copied once
+    data = sorted(r[0] for r in rows[1:])
+    assert data == ["BH1", "BH2", "BH3"]
+
+
+def test_processing_info_aggregated(tmp_path):
+    a = _write_book(tmp_path, "a.xlsx", {
+        "Processing Info": [["Metric", "Value"], ["Total Boreholes", "1"]],
+        "Material": [["Hole_ID"], ["BH1"]],
+    })
+    b = _write_book(tmp_path, "b.xlsx", {
+        "Processing Info": [["Metric", "Value"], ["Total Boreholes", "2"]],
+        "Material": [["Hole_ID"], ["BH2"]],
+    })
+
+    out = io.BytesIO(merge_excel_files([a, b]))
+    wb = load_workbook(out, data_only=True)
+    pi = {r[0]: r[1] for r in wb["Processing Info"].iter_rows(values_only=True) if r[0]}
+    assert pi["Total Boreholes"] == "3"
+
+
+def test_unique_sheet_only_in_one_input_passes_through(tmp_path):
+    a = _write_book(tmp_path, "a.xlsx", {
+        "Material": [["Hole_ID"], ["BH1"]],
+        "OnlyInA": [["X"], ["a"]],
+    })
+    b = _write_book(tmp_path, "b.xlsx", {
+        "Material": [["Hole_ID"], ["BH2"]],
+    })
+
+    out = io.BytesIO(merge_excel_files([a, b]))
+    wb = load_workbook(out, data_only=True)
+    assert "OnlyInA" in wb.sheetnames
+
+
+def test_apply_styles_header_and_alt_rows():
+    wb = Workbook(); ws = wb.active
+    ws.append(["Hole_ID", "material"])
+    ws.append(["BH1", "CLAY"])
+    ws.append(["BH2", "SAND"])  # row 3, odd
+    ws.append(["BH3", "GRAVEL"])  # row 4, even — should get alt fill
+
+    _apply_styles(ws)
+
+    # Header
+    assert ws.cell(1, 1).font.bold is True
+    assert ws.freeze_panes == "A2"
+
+    # Alt-row fill on row 4 (even), not row 3 (odd)
+    row4_fill = ws.cell(4, 1).fill.fgColor.value
+    row3_fill = ws.cell(3, 1).fill.fgColor.value
+    assert row4_fill == "FFF8F9FA"
+    # Row 3 has no fgColor set explicitly → openpyxl returns "00000000"
+    assert row3_fill in (None, "00000000")
+
+
+def test_apply_styles_flags_require_human_check():
+    wb = Workbook(); ws = wb.active
+    ws.append(["Hole_ID", "require_human_check"])
+    ws.append(["BH1", True])
+
+    _apply_styles(ws)
+
+    flagged = ws.cell(2, 2)
+    assert flagged.fill.fgColor.value == "FFFFEB9C"
+
+
+def test_empty_input_raises():
+    with pytest.raises(ValueError):
+        merge_excel_files([])
