@@ -14,12 +14,26 @@ import httpx
 from boreholeai._api import APIClientAsync, DEFAULT_BASE_URL, DEFAULT_TIMEOUT
 from boreholeai._batch import BatchResult, run_batch
 from boreholeai._files import collect_files
+from boreholeai._manifest import (
+    STATUS_COMPLETED,
+    STATUS_FAILED,
+    STATUS_PENDING,
+    STATUS_PROCESSING,
+    STATUS_QUEUED,
+    STATUS_SUBMITTED,
+    STATUS_SUBMIT_FAILED,
+    Manifest,
+)
 from boreholeai._merge import merge_results
 from boreholeai._version import __version__, __version_date__
 from boreholeai._types import FileResult, JobResult
 
 _DEFAULT_OUTPUT_DIR = "./results"
 _DEFAULT_CONCURRENCY = 6
+
+_BAR_WIDTH = 20
+_BAR_FILL = "█"
+_BAR_EMPTY = "░"
 
 
 class BoreholeAI:
@@ -105,13 +119,19 @@ class BoreholeAI:
         _log(f"Starting {len(files)} file(s) (concurrency={concurrency})")
         start = time.monotonic()
 
-        batch = asyncio.run(self._run(files, out, concurrency))
+        renderer = _PerFileProgress(start) if sys.stderr.isatty() else None
+        try:
+            batch = asyncio.run(self._run(files, out, concurrency, renderer))
+        finally:
+            if renderer is not None:
+                renderer.finalise()
 
         elapsed = time.monotonic() - start
         return self._finalise(batch, files, out, elapsed)
 
     async def _run(
         self, files: list[Path], output_dir: Path, concurrency: int,
+        renderer: Optional["_PerFileProgress"] = None,
     ) -> BatchResult:
         async with APIClientAsync(
             api_key=self._api_key,
@@ -121,6 +141,7 @@ class BoreholeAI:
         ) as client:
             return await run_batch(
                 client, files, output_dir, concurrency=concurrency,
+                on_progress=renderer.update if renderer else None,
             )
 
     def _finalise(
@@ -133,10 +154,17 @@ class BoreholeAI:
             for name in batch.successes
             if name in batch.job_ids and batch.workdir is not None
         ]
+        # Map each per-job dir back to its original input filename so any
+        # merge warning shows the user-facing name, not the job UUID.
+        dir_labels = {
+            batch.workdir / batch.job_ids[name]: name
+            for name in batch.successes
+            if name in batch.job_ids and batch.workdir is not None
+        }
 
         merged_files: list[FileResult] = []
         if success_dirs:
-            mr = merge_results(success_dirs, output_dir)
+            mr = merge_results(success_dirs, output_dir, dir_labels=dir_labels)
             merged_files = [FileResult(filename=p.name, path=p) for p in mr.files]
             if mr.warnings:
                 _log(f"{len(mr.warnings)} merge warning(s) — see merge_warnings.txt")
@@ -205,3 +233,104 @@ def _fmt_time(seconds: float) -> str:
         return f"{s}s"
     m, s = divmod(s, 60)
     return f"{m}m {s}s"
+
+
+def _fmt_progress(seconds: float) -> str:
+    """Compact mm:ss for inline progress display."""
+    s = max(0, int(seconds))
+    return f"{s // 60}:{s % 60:02d}"
+
+
+class _PerFileProgress:
+    """Live multi-line progress display, one line per input file.
+
+    Re-renders the block in place using ANSI cursor movement after each
+    state change. Non-TTY callers should not construct this — `client.py`
+    only instantiates it when `sys.stderr.isatty()`.
+    """
+
+    def __init__(self, started_at: float):
+        self._started_at = started_at
+        self._lines_drawn = 0
+        # Capture filename order from first update so lines stay stable
+        self._order: list[str] = []
+        self._file_started: dict[str, float] = {}
+
+    def update(self, manifest: Manifest) -> None:
+        """Re-draw all per-file lines based on current manifest state."""
+        if not self._order:
+            self._order = list(manifest.jobs.keys())
+
+        now = time.monotonic()
+        for name in self._order:
+            entry = manifest.jobs.get(name)
+            if entry is None:
+                continue
+            # Track when each file's clock started (first non-pending state).
+            if name not in self._file_started and entry.status != STATUS_PENDING:
+                self._file_started[name] = now
+
+        # Move cursor up to the top of the previously drawn block, clear,
+        # then re-draw every line. Each redraw is one frame.
+        if self._lines_drawn > 0:
+            sys.stderr.write(f"\033[{self._lines_drawn}A")
+
+        max_name_len = min(40, max((len(n) for n in self._order), default=10))
+        rendered = 0
+        for name in self._order:
+            entry = manifest.jobs.get(name)
+            if entry is None:
+                continue
+            elapsed = now - self._file_started.get(name, now)
+            line = self._format_line(name, entry, max_name_len, elapsed)
+            sys.stderr.write(f"\r\033[K  {line}\n")
+            rendered += 1
+
+        sys.stderr.flush()
+        self._lines_drawn = rendered
+
+    def finalise(self) -> None:
+        """Leave the last frame in place; subsequent _log calls print below it."""
+        # Nothing to do — the trailing newline on the last line means the
+        # cursor is already on a fresh line, and lines we drew remain visible.
+        self._lines_drawn = 0
+
+    def _format_line(
+        self, name: str, entry, name_width: int, elapsed: float,
+    ) -> str:
+        truncated = name if len(name) <= name_width else name[: name_width - 1] + "…"
+        padded = truncated.ljust(name_width)
+        time_str = _fmt_progress(elapsed) if entry.status != STATUS_PENDING else "—"
+        body = self._status_body(entry)
+        return f"{padded}  {body}  [{time_str}]"
+
+    def _status_body(self, entry) -> str:
+        s = entry.status
+        if s == STATUS_PENDING:
+            return "waiting to submit"
+        if s == STATUS_SUBMITTED:
+            return "submitted, waiting for worker"
+        if s == STATUS_QUEUED:
+            return "queued, waiting for worker"
+        if s == STATUS_PROCESSING:
+            return _bar(entry.pages_done, entry.num_pages or 0)
+        if s == STATUS_COMPLETED:
+            if entry.downloaded:
+                return "✓ done"
+            return "completed, downloading…"
+        if s == STATUS_FAILED:
+            return f"✗ failed ({entry.error or 'unknown error'})"
+        if s == STATUS_SUBMIT_FAILED:
+            return f"✗ submit failed ({entry.error or 'unknown error'})"
+        return s
+
+
+def _bar(done: int, total: int) -> str:
+    """Render a fixed-width filled-bar with N/M page count."""
+    if total <= 0:
+        # We don't know total yet — show indeterminate bar
+        return f"[{_BAR_EMPTY * _BAR_WIDTH}] processing"
+    pct = min(1.0, done / total)
+    filled = int(pct * _BAR_WIDTH)
+    bar = _BAR_FILL * filled + _BAR_EMPTY * (_BAR_WIDTH - filled)
+    return f"[{bar}] {done}/{total} pages"

@@ -3,6 +3,22 @@
 All notable changes to the BoreholeAI Python SDK are documented here.
 The project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.4.1 — 2026-04-28
+
+### Added
+
+- **Live per-file progress display.** When stderr is a TTY, the SDK now renders one progress line per input file and updates them in place as each job moves through submit → queue → processing → download. Each line shows a filled bar with `pages_done/pages_total` plus elapsed time. Non-TTY callers (piped output, CI without a terminal) see no rendered progress — the SDK falls back to standard logging.
+
+### Fixed
+
+- **`merge_warnings.txt` now shows input filenames instead of job UUIDs.** Previously a merge warning looked like `1baf6345-…: no AGS file found`, which made it hard to know which input PDF was missing outputs. It now reads `AU-BH401.pdf: no AGS file found`.
+
+### Internal
+
+- `JobEntry` gained a `pages_done: int = 0` field, populated from poll responses to drive the new progress display.
+- `run_batch()` accepts an optional `on_progress: Callable[[Manifest], None]` callback fired after every state change.
+- `merge_results()` accepts an optional `dir_labels: dict[Path, str]` parameter so the caller can provide friendly names for warning messages.
+
 ## 0.4.0 — 2026-04-28
 
 ### Changed (architecture)

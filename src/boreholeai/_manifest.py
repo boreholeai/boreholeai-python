@@ -42,6 +42,7 @@ class JobEntry:
 
     job_id: Optional[str] = None
     num_pages: Optional[int] = None
+    pages_done: int = 0                 # updated from poll responses; for live progress
     status: str = STATUS_PENDING
     downloaded: bool = False
     purged: bool = False                # only meaningful if API key has purge_on_download
