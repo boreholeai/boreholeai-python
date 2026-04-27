@@ -66,6 +66,7 @@ client = BoreholeAI(api_key="bhai_your_api_key_here")
 # Process a single borehole log
 result = client.process_documents("BH01.pdf", output_dir="./results")
 
+print(f"Status: {result.status}")
 print(f"Pages processed: {result.num_pages}")
 for f in result.files:
     print(f"  {f.filename}")
@@ -73,19 +74,53 @@ for f in result.files:
 
 ## Folder / Batch Processing
 
-Pass a directory path to process multiple files together. Results are merged into a single ground profile Excel, test data Excel, and AGS file, with one annotated PDF per input file.
+Pass a directory path to process multiple files together. The SDK fans out one server-side job per file (up to `concurrency` in flight at a time), polls each, downloads all outputs, then merges them locally into a single ground profile Excel, test data Excel, and AGS file. One annotated PDF per input file.
 
 ```python
-result = client.process_documents("./borehole_logs/", output_dir="./results")
+result = client.process_documents(
+    "./borehole_logs/",
+    output_dir="./results",
+    concurrency=6,                  # max in-flight POSTs (default 6)
+)
 
 # Output:
-#   Borehole_ground_profile.xlsx   (merged from all input files)
-#   Borehole_test_data.xlsx        (merged from all input files)
-#   Borehole_ags4.ags              (merged from all input files)
-#   BH01_annotated.pdf             (one per input file)
+#   Borehole_ground_profile_merged.xlsx
+#   Borehole_test_data_merged.xlsx
+#   Borehole_ags4_merged.ags
+#   BH01_annotated.pdf              (one per input file)
 #   BH02_annotated.pdf
 #   BH03_annotated.pdf
 ```
+
+A single-file run keeps the original filenames (no `_merged` suffix).
+
+## Resume After Interrupt
+
+If processing is interrupted (Ctrl-C, network drop, laptop sleep), simply re-run with the same `output_dir`. The SDK persists per-file state to `.boreholeai_manifest.json` and skips work that's already done.
+
+```python
+# First run — interrupted halfway through 100 files
+client.process_documents("./logs/", output_dir="./results")
+
+# Same call, same output_dir — picks up where it left off
+client.process_documents("./logs/", output_dir="./results")
+```
+
+## Partial Failure Handling
+
+If some files fail server-side processing (bad scan, unreadable layout, etc.), the rest are merged normally and the failed files are reported via `result.failures`. The call only raises if every file fails.
+
+```python
+result = client.process_documents("./logs/", output_dir="./results")
+
+if result.status == "partial":
+    print(f"{len(result.failures)} file(s) failed:")
+    for filename, error in result.failures.items():
+        print(f"  {filename}: {error}")
+    print(f"{len(result.successes)} succeeded and were merged.")
+```
+
+A `merge_warnings.txt` file is written to `output_dir` only when warnings occur during merge (e.g. a job missing one of its result files).
 
 ## Supported File Types
 
@@ -129,16 +164,21 @@ except InsufficientCreditsError:
 ```python
 @dataclass
 class JobResult:
-    job_id: str              # Unique job identifier
-    status: str              # "completed"
-    num_pages: int           # Total pages processed
-    credits_used: int        # Credits consumed
-    files: list[FileResult]  # Downloaded result files
+    job_id: str                  # Primary (first) server-side job ID
+    status: str                  # "completed" | "partial" | "failed"
+    num_pages: int               # Total pages processed across all jobs
+    credits_used: int            # Total credits consumed
+    files: list[FileResult]      # Downloaded / merged result files
+
+    # Per-file detail for fan-out batches:
+    job_ids: list[str]           # Every server-side job ID
+    successes: list[str]         # Input filenames that completed
+    failures: dict[str, str]     # Input filename → error message
 
 @dataclass
 class FileResult:
-    filename: str            # e.g. "Borehole_ground_profile.xlsx"
-    path: Path               # Local path where file was saved
+    filename: str                # e.g. "Borehole_ground_profile_merged.xlsx"
+    path: Path                   # Local path where file was saved
 ```
 
 ## Accuracy

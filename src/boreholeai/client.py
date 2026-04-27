@@ -1,32 +1,25 @@
-"""BoreholeAI Python SDK client."""
+"""BoreholeAI Python SDK client — fan-out + client-side merge."""
 
 from __future__ import annotations
 
+import asyncio
+import shutil
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
-from boreholeai._api import APIClient, DEFAULT_BASE_URL, DEFAULT_TIMEOUT
+import httpx
+
+from boreholeai._api import APIClientAsync, DEFAULT_BASE_URL, DEFAULT_TIMEOUT
+from boreholeai._batch import BatchResult, run_batch
 from boreholeai._files import collect_files
+from boreholeai._merge import merge_results
 from boreholeai._version import __version__, __version_date__
 from boreholeai._types import FileResult, JobResult
-from boreholeai.exceptions import BoreholeAIError, JobFailedError
 
-# Polling configuration
-_POLL_INITIAL_INTERVAL = 2.0   # seconds
-_POLL_MAX_INTERVAL = 10.0      # seconds
-_POLL_BACKOFF_FACTOR = 1.5
-
-# Default output directory
 _DEFAULT_OUTPUT_DIR = "./results"
-
-# Progress bar config
-_BAR_WIDTH = 20
-_BAR_FILL = "█"
-_BAR_EMPTY = " "
-
-# Fallback arrow spinner (if pages_total is 0 or unknown)
-_ARROW_FRAMES = ["▹▹▹▸▹", "▹▹▸▹▹", "▹▸▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸"]
+_DEFAULT_CONCURRENCY = 6
 
 
 class BoreholeAI:
@@ -39,10 +32,17 @@ class BoreholeAI:
         client = BoreholeAI(api_key="bhai_xxx")
 
         # Single file
-        results = client.process_documents("borehole.pdf")
+        result = client.process_documents("borehole.pdf")
 
-        # Folder — all PDFs + images processed together, merged output
-        results = client.process_documents("./logs/", output_dir="./results")
+        # Folder — fans out to N concurrent server jobs, merges results
+        result = client.process_documents("./logs/", output_dir="./results", concurrency=6)
+
+    For a folder of N files, this submits N concurrent jobs (bounded by
+    `concurrency`), polls each, downloads all outputs, then produces one
+    merged ground_profile / test_data / AGS file.
+
+    Resumes automatically if interrupted: re-running with the same
+    `output_dir` skips already-completed work.
     """
 
     def __init__(
@@ -51,17 +51,21 @@ class BoreholeAI:
         *,
         base_url: str = DEFAULT_BASE_URL,
         timeout: float = DEFAULT_TIMEOUT,
+        _transport: Optional[httpx.AsyncBaseTransport] = None,
     ):
         if not api_key:
             raise ValueError("api_key is required")
+        self._api_key = api_key
+        self._base_url = base_url
+        self._timeout = timeout
+        self._transport = _transport
         date_suffix = f" ({__version_date__})" if __version_date__ != "dev" else ""
         _log(f"boreholeai v{__version__}{date_suffix}")
         _log("To check for updates: pip install --upgrade boreholeai")
-        self._api = APIClient(api_key=api_key, base_url=base_url, timeout=timeout)
 
     def close(self) -> None:
-        """Close the underlying HTTP client."""
-        self._api.close()
+        """No-op — async clients are scoped per call. Kept for API symmetry."""
+        pass
 
     def __enter__(self) -> BoreholeAI:
         return self
@@ -74,145 +78,113 @@ class BoreholeAI:
         input_path: str | Path,
         *,
         output_dir: str | Path = _DEFAULT_OUTPUT_DIR,
+        concurrency: int = _DEFAULT_CONCURRENCY,
     ) -> JobResult:
-        """Upload files, process them, and download results.
+        """Submit, process, and merge a single file or a folder of files.
 
         Args:
-            input_path: Path to a single file or a directory of files.
-                Supported formats: PDF, PNG, JPG, JPEG, TIF, TIFF, WebP.
-            output_dir: Directory to save result files. Created if it doesn't exist.
+            input_path: Single file or directory.
+                Supported: PDF, PNG, JPG, JPEG, TIF, TIFF, WebP.
+            output_dir: Where merged results land. Created if missing.
+                If `.boreholeai_manifest.json` is present from a prior run,
+                that work is resumed; already-completed files are skipped.
+            concurrency: Max in-flight POSTs and downloads (default 6).
 
         Returns:
-            JobResult with job metadata and list of downloaded files.
+            JobResult — `status` is "completed", "partial", or "failed";
+            `failures` lists per-file errors when partial.
 
         Raises:
-            FileNotFoundError: If input_path doesn't exist.
-            ValueError: If no supported files found.
-            AuthenticationError: If API key is invalid.
-            InsufficientCreditsError: If not enough credits.
-            JobFailedError: If processing fails on the server.
+            FileNotFoundError, ValueError on bad input. Otherwise per-file
+            failures are reported via `result.failures`, not raised.
         """
         files = collect_files(input_path)
         out = Path(output_dir).resolve()
         out.mkdir(parents=True, exist_ok=True)
 
-        filenames = ", ".join(f.name for f in files)
+        _log(f"Starting {len(files)} file(s) (concurrency={concurrency})")
+        start = time.monotonic()
 
-        try:
-            job_data = self._api.create_job(files)
-        except BoreholeAIError as exc:
-            _log(f"Error: {exc}")
-            raise
+        batch = asyncio.run(self._run(files, out, concurrency))
 
-        job_id = job_data["job_id"]
-        num_pages = job_data["num_pages"]
-        short_id = job_id[:8]
-        tag = f"[{self._api.server_tag}] " if self._api.server_tag else ""
-        _log(f"{tag}Starting {filenames}")
-        _log(f"{tag}Job {short_id} created — {num_pages} page(s)")
+        elapsed = time.monotonic() - start
+        return self._finalise(batch, files, out, elapsed)
 
-        # Poll
-        try:
-            start = time.monotonic()
-            result = self._poll_until_done(job_id, num_pages, start)
-            elapsed = time.monotonic() - start
-        except JobFailedError as exc:
-            _log(f"Error: {exc}")
-            raise
-        except BoreholeAIError as exc:
-            _log(f"Error: {exc}")
-            raise
-        except (ConnectionError, OSError) as exc:
-            _log(f"Connection lost: {exc}")
-            raise
-
-        _log(f"Completed {num_pages} page(s) in {_fmt_time(elapsed)}")
-
-        # Download results
-        downloaded = self._download_results(job_id, out)
-
-        return JobResult(
-            job_id=job_id,
-            status=result["status"],
-            num_pages=num_pages,
-            credits_used=num_pages,
-            files=downloaded,
-        )
-
-    def _poll_until_done(self, job_id: str, num_pages: int, start: float) -> dict:
-        """Poll GET /v1/jobs/{id} until status is completed or failed."""
-        interval = _POLL_INITIAL_INTERVAL
-        spin_idx = 0
-
-        while True:
-            data = self._api.get_job(job_id)
-            status = data["status"]
-
-            if status == "completed":
-                # Clear the spinner line
-                _clear_line()
-                return data
-
-            if status == "failed":
-                _clear_line()
-                error = data.get("error_message", "Unknown error")
-                raise JobFailedError(f"Job {job_id} failed: {error}")
-
-            progress = data.get("progress") or {}
-            pages_done = progress.get("pages_done", 0)
-            pages_total = progress.get("pages_total", num_pages)
-            elapsed = time.monotonic() - start
-            spin_idx += 1
-
-            if pages_total > 0:
-                pct = pages_done / pages_total
-                filled = int(pct * _BAR_WIDTH)
-                bar = _BAR_FILL * filled + _BAR_EMPTY * (_BAR_WIDTH - filled)
-                _spinner_line(
-                    f"[{bar}] {pages_done}/{pages_total} pages "
-                    f"({int(pct * 100)}%) [{_fmt_time(elapsed)}]"
-                )
-            else:
-                arrow = _ARROW_FRAMES[spin_idx % len(_ARROW_FRAMES)]
-                _spinner_line(
-                    f"{arrow} Processing [{_fmt_time(elapsed)}]"
-                )
-
-            time.sleep(interval)
-            interval = min(interval * _POLL_BACKOFF_FACTOR, _POLL_MAX_INTERVAL)
-
-    def _download_results(self, job_id: str, output_dir: Path) -> list[FileResult]:
-        """Download all result files to output_dir.
-
-        If the API key has the strict-retention flag set (server returns
-        purge_on_download=true on GET /v1/jobs/{id}/results), this method
-        calls DELETE /v1/jobs/{id} after all files are written to disk —
-        the server then purges every stored byte for this job.
-        """
-        results_data = self._api.get_results(job_id)
-        downloaded: list[FileResult] = []
-
-        for file_info in results_data.get("files", []):
-            filename = file_info["filename"]
-            url = file_info["url"]
-
-            content = self._api.download_file(url)
-            dest = output_dir / filename
-            dest.write_bytes(content)
-            downloaded.append(FileResult(filename=filename, path=dest))
-
-        _log(f"Saved {len(downloaded)} file(s) to {output_dir}")
-        for f in downloaded:
-            _log(f"  {f.filename}")
-
-        if results_data.get("purge_on_download"):
-            purge = self._api.delete_job(job_id)
-            _log(
-                f"Purged {purge.get('files_deleted', 0)} server-side file(s) "
-                f"for job {job_id[:8]}"
+    async def _run(
+        self, files: list[Path], output_dir: Path, concurrency: int,
+    ) -> BatchResult:
+        async with APIClientAsync(
+            api_key=self._api_key,
+            base_url=self._base_url,
+            timeout=self._timeout,
+            _transport=self._transport,
+        ) as client:
+            return await run_batch(
+                client, files, output_dir, concurrency=concurrency,
             )
 
-        return downloaded
+    def _finalise(
+        self, batch: BatchResult, files: list[Path],
+        output_dir: Path, elapsed: float,
+    ) -> JobResult:
+        """Merge successful jobs, log summary, build JobResult."""
+        success_dirs = [
+            batch.workdir / batch.job_ids[name]
+            for name in batch.successes
+            if name in batch.job_ids and batch.workdir is not None
+        ]
+
+        merged_files: list[FileResult] = []
+        if success_dirs:
+            mr = merge_results(success_dirs, output_dir)
+            merged_files = [FileResult(filename=p.name, path=p) for p in mr.files]
+            if mr.warnings:
+                _log(f"{len(mr.warnings)} merge warning(s) — see merge_warnings.txt")
+
+        n_total = len(files)
+        n_ok = len(batch.successes)
+        n_fail = len(batch.failures)
+        if n_ok == n_total:
+            status = "completed"
+        elif n_ok == 0:
+            status = "failed"
+        else:
+            status = "partial"
+
+        _log(
+            f"Done {n_ok}/{n_total} file(s) in {_fmt_time(elapsed)}"
+            + (f" — {n_fail} failure(s)" if n_fail else ""),
+        )
+        if batch.failures:
+            _log("Failures:")
+            for name, err in batch.failures.items():
+                _log(f"  {name}: {err}")
+        if merged_files:
+            _log(f"Saved {len(merged_files)} file(s) to {output_dir}")
+            for f in merged_files:
+                _log(f"  {f.filename}")
+
+        # Clean up the per-job workdir only when everything succeeded.
+        # On partial/failed runs we keep it so the user can inspect or resume.
+        if status == "completed" and batch.workdir is not None and batch.workdir.exists():
+            shutil.rmtree(batch.workdir, ignore_errors=True)
+
+        primary_job_id = next(iter(batch.job_ids.values()), "")
+        total_pages = sum(
+            (e.num_pages or 0)
+            for e in (batch.manifest.jobs.values() if batch.manifest else [])
+        )
+
+        return JobResult(
+            job_id=primary_job_id,
+            status=status,
+            num_pages=total_pages,
+            credits_used=total_pages,
+            files=merged_files,
+            job_ids=list(batch.job_ids.values()),
+            successes=list(batch.successes),
+            failures=dict(batch.failures),
+        )
 
 
 
@@ -226,20 +198,8 @@ def _log(message: str) -> None:
     print(f"  {message}", file=sys.stderr, flush=True)
 
 
-def _spinner_line(message: str) -> None:
-    """Overwrite the current line in-place (for spinner updates)."""
-    sys.stderr.write(f"\r  {message}\033[K")
-    sys.stderr.flush()
-
-
-def _clear_line() -> None:
-    """Clear the spinner line so the next _log prints cleanly."""
-    sys.stderr.write("\r\033[K")
-    sys.stderr.flush()
-
-
 def _fmt_time(seconds: float) -> str:
-    """Format elapsed seconds as a human-readable string."""
+    """Human-readable elapsed time."""
     s = int(seconds)
     if s < 60:
         return f"{s}s"
