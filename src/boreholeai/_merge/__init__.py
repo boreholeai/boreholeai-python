@@ -23,6 +23,7 @@ import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from boreholeai._merge._ags import merge_ags_files
 from boreholeai._merge._excel import merge_excel_files
@@ -41,8 +42,14 @@ class MergeResult:
 def merge_results(
     input_dirs: list[Path],
     output_dir: Path,
+    *,
+    dir_labels: Optional[dict[Path, str]] = None,
 ) -> MergeResult:
     """Merge per-job result directories into `output_dir`.
+
+    `dir_labels` (optional): map each input dir → display name used in
+    warnings (e.g. the original PDF filename). If not provided, the dir's
+    own basename (typically a UUID) is used.
 
     Raises ValueError on empty input. Missing per-job files are recorded
     as warnings, not errors — the merge proceeds for whichever categories
@@ -54,6 +61,14 @@ def merge_results(
     input_dirs = [Path(d) for d in input_dirs]
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Resolve label keys to absolute Paths so caller can pass either.
+    resolved_labels: dict[Path, str] = {
+        Path(k).resolve(): v for k, v in (dir_labels or {}).items()
+    }
+
+    def _label(d: Path) -> str:
+        return resolved_labels.get(d.resolve(), d.name)
 
     result = MergeResult()
 
@@ -73,19 +88,20 @@ def merge_results(
         gp = _find_one(d, "Borehole_ground_profile*.xlsx")
         td = _find_one(d, "Borehole_test_data*.xlsx")
         ags = _find_one(d, "Borehole_ags4*.ags")
+        label = _label(d)
 
         if gp is None:
-            result.warnings.append(f"{d.name}: no ground_profile xlsx found")
+            result.warnings.append(f"{label}: no ground_profile xlsx found")
         else:
             ground_profile_paths.append(gp)
 
         if td is None:
-            result.warnings.append(f"{d.name}: no test_data xlsx found")
+            result.warnings.append(f"{label}: no test_data xlsx found")
         else:
             test_data_paths.append(td)
 
         if ags is None:
-            result.warnings.append(f"{d.name}: no AGS file found")
+            result.warnings.append(f"{label}: no AGS file found")
         else:
             ags_paths.append(ags)
 
