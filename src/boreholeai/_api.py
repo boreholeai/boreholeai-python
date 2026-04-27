@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from pathlib import Path
 from typing import Any
@@ -27,95 +28,120 @@ DEFAULT_TIMEOUT = 120.0
 CONNECT_TIMEOUT = 5.0
 
 
-class APIClient:
-    """Thin wrapper around httpx for authenticated requests.
+class APIClientAsync:
+    """Async sibling of `APIClient` — same surface, asyncio-native.
 
-    Tries URLs in order: api1 → api2 → api3.
-    On connection failure, falls back to the next URL. Once connected,
-    stays on that server for the remainder of the session.
+    Owns auth headers, base-URL failover, and the underlying httpx clients.
+    Used by `_batch.py` for concurrent submit / poll / download. Sync code
+    paths keep using `APIClient`.
+
+    The optional `_transport` kwarg is a test seam (`httpx.MockTransport`).
+    Pass `None` in production.
     """
 
-    def __init__(self, api_key: str, base_url: str, timeout: float):
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str,
+        timeout: float,
+        *,
+        _transport: httpx.AsyncBaseTransport | None = None,
+    ):
         self._auth_headers: dict[str, str] = {"Authorization": f"Bearer {api_key}"}
         tz = _detect_local_timezone()
         if tz:
             self._auth_headers["X-Timezone"] = tz
         self._timeout = timeout
         self._urls = [base_url] if base_url not in DEFAULT_URLS else DEFAULT_URLS
-        self._client: httpx.Client | None = None
-        self.server_tag: str = ""  # set after successful connection (e.g. "api1")
+        self._transport = _transport
+        self._api_client: httpx.AsyncClient | None = None
+        self._dl_client: httpx.AsyncClient | None = None
+        self.server_tag: str = ""
 
-    def _connect(self) -> httpx.Client:
+    async def _connect(self) -> httpx.AsyncClient:
         """Try each URL in order until one responds."""
-        if self._client is not None:
-            return self._client
+        if self._api_client is not None:
+            return self._api_client
 
         for i, url in enumerate(self._urls):
             try:
-                client = httpx.Client(
+                client = httpx.AsyncClient(
                     base_url=url,
                     headers=self._auth_headers,
                     timeout=httpx.Timeout(self._timeout, connect=CONNECT_TIMEOUT),
+                    transport=self._transport,
                 )
-                health = client.get("/health")
+                health = await client.get("/health")
                 if health.status_code >= 500:
-                    client.close()
+                    await client.aclose()
                     raise httpx.ConnectError(f"{url} returned {health.status_code}")
-                self._client = client
-                self.server_tag = url.split("//")[1].split(".")[0]  # e.g. "api1"
-                return self._client
+                self._api_client = client
+                self.server_tag = url.split("//")[1].split(".")[0]
+                return self._api_client
             except (httpx.ConnectError, httpx.ConnectTimeout):
                 if i < len(self._urls) - 1:
                     continue
                 raise
 
-    def close(self) -> None:
-        if self._client:
-            self._client.close()
-            self._client = None
+    async def close(self) -> None:
+        if self._api_client is not None:
+            await self._api_client.aclose()
+            self._api_client = None
+        if self._dl_client is not None:
+            await self._dl_client.aclose()
+            self._dl_client = None
 
-    def create_job(self, file_paths: list[Path]) -> dict[str, Any]:
-        """POST /v1/jobs — upload files and create a job.
+    async def __aenter__(self) -> APIClientAsync:
+        return self
 
-        Returns {"job_id": ..., "num_pages": ..., "credits_remaining": ...}.
-        """
-        client = self._connect()
+    async def __aexit__(self, *args: object) -> None:
+        await self.close()
+
+    async def create_job(self, file_paths: list[Path]) -> dict[str, Any]:
+        """POST /v1/jobs — upload files and create a job."""
+        client = await self._connect()
+        # Read files concurrently in threads so the event loop isn't blocked.
+        contents = await asyncio.gather(
+            *(asyncio.to_thread(p.read_bytes) for p in file_paths),
+        )
         files = [
-            ("files", (p.name, p.read_bytes()))
-            for p in file_paths
+            ("files", (p.name, content))
+            for p, content in zip(file_paths, contents)
         ]
-        resp = client.post("/v1/jobs", files=files)
+        resp = await client.post("/v1/jobs", files=files)
         _raise_for_status(resp)
         return resp.json()
 
-    def get_job(self, job_id: str) -> dict[str, Any]:
-        """GET /v1/jobs/{id} — poll job status."""
-        client = self._connect()
-        resp = client.get(f"/v1/jobs/{job_id}")
+    async def get_job(self, job_id: str) -> dict[str, Any]:
+        client = await self._connect()
+        resp = await client.get(f"/v1/jobs/{job_id}")
         _raise_for_status(resp)
         return resp.json()
 
-    def get_results(self, job_id: str) -> dict[str, Any]:
-        """GET /v1/jobs/{id}/results — signed download URLs."""
-        client = self._connect()
-        resp = client.get(f"/v1/jobs/{job_id}/results")
+    async def get_results(self, job_id: str) -> dict[str, Any]:
+        client = await self._connect()
+        resp = await client.get(f"/v1/jobs/{job_id}/results")
         _raise_for_status(resp)
         return resp.json()
 
-    def download_file(self, url: str) -> bytes:
-        """Download a file from a signed URL."""
-        resp = httpx.get(url, timeout=self._timeout)
+    async def download_file(self, url: str) -> bytes:
+        """Download a signed URL.
+
+        Uses a separate httpx.AsyncClient (no auth headers, no base URL) since
+        signed URLs go to Supabase Storage, not the API host.
+        """
+        if self._dl_client is None:
+            self._dl_client = httpx.AsyncClient(
+                timeout=self._timeout, transport=self._transport,
+            )
+        resp = await self._dl_client.get(url)
         resp.raise_for_status()
         return resp.content
 
-    def delete_job(self, job_id: str) -> dict[str, Any]:
-        """DELETE /v1/jobs/{id} — purge all stored files for this job.
-
-        Used by the strict-retention enterprise tier (purge-on-download).
-        Idempotent — safe to call even if the job is already purged.
-        """
-        client = self._connect()
-        resp = client.delete(f"/v1/jobs/{job_id}")
+    async def delete_job(self, job_id: str) -> dict[str, Any]:
+        """DELETE /v1/jobs/{id} — purge stored files for this job (idempotent)."""
+        client = await self._connect()
+        resp = await client.delete(f"/v1/jobs/{job_id}")
         _raise_for_status(resp)
         return resp.json()
 

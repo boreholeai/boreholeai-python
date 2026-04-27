@@ -5,3 +5,6 @@ dist/
 build/
 .venv/
 .env
+.DS_Store
+.claude/
+.pytest_cache/
