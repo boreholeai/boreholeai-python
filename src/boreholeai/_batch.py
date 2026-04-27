@@ -19,7 +19,7 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from boreholeai import _manifest
 from boreholeai._api import APIClientAsync
@@ -70,6 +70,7 @@ async def run_batch(
     output_dir: Path,
     *,
     concurrency: int = _DEFAULT_CONCURRENCY,
+    on_progress: Optional[Callable[[Manifest], None]] = None,
 ) -> BatchResult:
     """Submit, poll, and download N files concurrently.
 
@@ -77,6 +78,10 @@ async def run_batch(
     interrupted run can resume by re-invoking with the same arguments.
     Does NOT call merge — caller decides when to merge across the
     workdir.
+
+    `on_progress` (optional): called with the current Manifest after every
+    state change. Used by `client.py` to render a per-file progress display.
+    Must not raise; exceptions are swallowed to avoid breaking the batch.
     """
     files = list(files)
     if not files:
@@ -97,23 +102,26 @@ async def run_batch(
 
     files_by_name = {f.name: f for f in files}
 
+    # Initial render so users see all files in their starting state
+    _emit_progress(on_progress, manifest)
+
     # PHASE 1 — SUBMIT
     await asyncio.gather(*(
-        _submit_one(name, files_by_name[name], client, sem, manifest, save_lock, output_dir)
+        _submit_one(name, files_by_name[name], client, sem, manifest, save_lock, output_dir, on_progress)
         for name in files_by_name
         if manifest.needs_submit(name)
     ))
 
     # PHASE 2 — POLL
     await asyncio.gather(*(
-        _poll_one(name, client, manifest, save_lock, output_dir)
+        _poll_one(name, client, manifest, save_lock, output_dir, on_progress)
         for name in files_by_name
         if manifest.needs_poll(name)
     ))
 
     # PHASE 3 — DOWNLOAD (and optional enterprise purge)
     await asyncio.gather(*(
-        _download_one(name, client, sem, manifest, save_lock, output_dir, workdir)
+        _download_one(name, client, sem, manifest, save_lock, output_dir, workdir, on_progress)
         for name in files_by_name
         if manifest.needs_download(name)
     ))
@@ -131,6 +139,7 @@ async def _submit_one(
     name: str, file_path: Path, client: APIClientAsync,
     sem: asyncio.Semaphore, manifest: Manifest,
     save_lock: asyncio.Lock, output_dir: Path,
+    on_progress: Optional[Callable[[Manifest], None]] = None,
 ) -> None:
     """Submit one file with exponential-backoff retry on transient errors."""
     delay = _SUBMIT_RETRY_BASE
@@ -146,11 +155,12 @@ async def _submit_one(
                 e.submitted_at = _manifest._now()
                 e.error = None
                 _manifest.save(manifest, output_dir)
+            _emit_progress(on_progress, manifest)
             logger.info("submitted %s → job %s", name, data["job_id"][:8])
             return
         except (RateLimitError, ServerError) as exc:
             if attempt >= _SUBMIT_MAX_RETRIES:
-                await _mark_submit_failed(name, str(exc), manifest, save_lock, output_dir)
+                await _mark_submit_failed(name, str(exc), manifest, save_lock, output_dir, on_progress)
                 return
             logger.warning(
                 "transient submit error on %s (%s) — retry %d/%d in %.1fs",
@@ -160,28 +170,31 @@ async def _submit_one(
             delay = min(delay * 2, _SUBMIT_RETRY_MAX)
         except (AuthenticationError, InsufficientCreditsError) as exc:
             # Fatal — no point retrying this file or any other (caller will see)
-            await _mark_submit_failed(name, str(exc), manifest, save_lock, output_dir)
+            await _mark_submit_failed(name, str(exc), manifest, save_lock, output_dir, on_progress)
             return
         except BoreholeAIError as exc:
-            await _mark_submit_failed(name, str(exc), manifest, save_lock, output_dir)
+            await _mark_submit_failed(name, str(exc), manifest, save_lock, output_dir, on_progress)
             return
 
 
 async def _mark_submit_failed(
     name: str, error: str, manifest: Manifest,
     save_lock: asyncio.Lock, output_dir: Path,
+    on_progress: Optional[Callable[[Manifest], None]] = None,
 ) -> None:
     async with save_lock:
         e = manifest.jobs[name]
         e.status = STATUS_SUBMIT_FAILED
         e.error = error
         _manifest.save(manifest, output_dir)
+    _emit_progress(on_progress, manifest)
     logger.error("submit failed for %s: %s", name, error)
 
 
 async def _poll_one(
     name: str, client: APIClientAsync, manifest: Manifest,
     save_lock: asyncio.Lock, output_dir: Path,
+    on_progress: Optional[Callable[[Manifest], None]] = None,
 ) -> None:
     """Poll one job until it reaches a terminal state. Tolerates transient
     polling errors with backoff — only terminal job statuses end the loop."""
@@ -200,9 +213,17 @@ async def _poll_one(
             continue
 
         status = data.get("status", "")
+        progress = data.get("progress") or {}
         async with save_lock:
             e = manifest.jobs[name]
             e.status = status
+            # Live page-progress for the renderer
+            pages_done = progress.get("pages_done")
+            pages_total = progress.get("pages_total")
+            if pages_done is not None:
+                e.pages_done = int(pages_done)
+            if pages_total and e.num_pages is None:
+                e.num_pages = int(pages_total)
             if status == STATUS_FAILED:
                 e.error = data.get("error_message", "unknown error")
                 e.completed_at = _manifest._now()
@@ -210,7 +231,10 @@ async def _poll_one(
                 e.completed_at = _manifest._now()
                 if e.num_pages is None:
                     e.num_pages = data.get("num_pages")
+                if e.num_pages:
+                    e.pages_done = e.num_pages
             _manifest.save(manifest, output_dir)
+        _emit_progress(on_progress, manifest)
 
         if status in (STATUS_COMPLETED, STATUS_FAILED):
             return
@@ -223,6 +247,7 @@ async def _download_one(
     name: str, client: APIClientAsync, sem: asyncio.Semaphore,
     manifest: Manifest, save_lock: asyncio.Lock,
     output_dir: Path, workdir: Path,
+    on_progress: Optional[Callable[[Manifest], None]] = None,
 ) -> None:
     """Fetch signed URLs, download every file into workdir/{job_id}/, and
     optionally call DELETE for the enterprise purge-on-download flow."""
@@ -240,6 +265,7 @@ async def _download_one(
             async with save_lock:
                 manifest.jobs[name].error = f"results fetch failed: {exc}"
                 _manifest.save(manifest, output_dir)
+            _emit_progress(on_progress, manifest)
             logger.error("results fetch failed for %s: %s", name, exc)
             return
 
@@ -251,6 +277,7 @@ async def _download_one(
                 async with save_lock:
                     manifest.jobs[name].error = f"download failed: {exc}"
                     _manifest.save(manifest, output_dir)
+                _emit_progress(on_progress, manifest)
                 logger.error("download failed for %s: %s", name, exc)
                 return
             (job_workdir / f["filename"]).write_bytes(content)
@@ -258,6 +285,7 @@ async def _download_one(
         async with save_lock:
             manifest.jobs[name].downloaded = True
             _manifest.save(manifest, output_dir)
+        _emit_progress(on_progress, manifest)
         logger.info("downloaded %d file(s) for %s", len(files_to_dl), name)
 
         if results.get("purge_on_download"):
@@ -266,12 +294,26 @@ async def _download_one(
                 async with save_lock:
                     manifest.jobs[name].purged = True
                     _manifest.save(manifest, output_dir)
+                _emit_progress(on_progress, manifest)
                 logger.info(
                     "purged %d server file(s) for %s",
                     purge.get("files_deleted", 0), name,
                 )
             except BoreholeAIError as exc:
                 logger.warning("purge failed for %s: %s", name, exc)
+
+
+def _emit_progress(
+    cb: Optional[Callable[[Manifest], None]], manifest: Manifest,
+) -> None:
+    """Fire the progress callback if set, swallowing any exceptions so the
+    batch never fails because the renderer crashed."""
+    if cb is None:
+        return
+    try:
+        cb(manifest)
+    except Exception:
+        logger.debug("progress callback raised", exc_info=True)
 
 
 def _build_result(

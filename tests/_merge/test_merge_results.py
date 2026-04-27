@@ -115,3 +115,20 @@ def test_no_ags_anywhere_omits_ags_output(tmp_path):
     names = {f.name for f in result.files}
     assert "Borehole_ags4_merged.ags" not in names
     assert sum("AGS" in w for w in result.warnings) == 2
+
+
+def test_dir_labels_used_in_warnings(tmp_path):
+    """Warnings should show the caller-provided label, not the dir UUID."""
+    # Use UUID-shaped dir names to mimic real workdir/{job_id}/
+    j1 = _make_job_dir(tmp_path / "1baf6345-ae8b-455f-8083-5f4cbd5ce382")
+    j2 = _make_job_dir(tmp_path / "9c3a1234-aaaa-bbbb-cccc-eeeeffff1111", ags=False)
+    out = tmp_path / "out"
+    labels = {j1: "AU-BH401.pdf", j2: "AU-BH402.pdf"}
+
+    result = merge_results([j1, j2], out, dir_labels=labels)
+
+    # Warning text references the human filename, not the UUID
+    assert any("AU-BH402.pdf" in w for w in result.warnings)
+    for w in result.warnings:
+        assert "9c3a1234" not in w
+        assert "1baf6345" not in w  # j1 wasn't missing anything; shouldn't appear
