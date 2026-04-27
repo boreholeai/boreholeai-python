@@ -3,6 +3,16 @@
 All notable changes to the BoreholeAI Python SDK are documented here.
 The project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.4.2 — 2026-04-28
+
+### Added
+
+- **Visible enterprise purge confirmation.** When an API key has `purge_on_download` enabled, the SDK now prints a final summary line `🔴 Server files deleted for N job(s) (enterprise purge-on-download)` after the run, so users can see at a glance that the server-side `DELETE /v1/jobs/{id}` calls succeeded. Previously the purge happened silently — only visible at `INFO` log level.
+
+### Changed
+
+- The `Saved N file(s) to ...` line is now prefixed with `🟢` to make the success summary scan more easily.
+
 ## 0.4.1 — 2026-04-28
 
 ### Added
