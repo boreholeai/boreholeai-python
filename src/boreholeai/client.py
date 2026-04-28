@@ -12,7 +12,7 @@ from typing import Optional
 import httpx
 
 from boreholeai._api import APIClientAsync, DEFAULT_BASE_URL, DEFAULT_TIMEOUT
-from boreholeai._batch import BatchResult, run_batch
+from boreholeai._batch import BatchResult, resolve_effective_concurrency, run_batch
 from boreholeai._files import collect_files
 from boreholeai._manifest import (
     STATUS_COMPLETED,
@@ -116,7 +116,6 @@ class BoreholeAI:
         out = Path(output_dir).resolve()
         out.mkdir(parents=True, exist_ok=True)
 
-        _log(f"Starting {len(files)} file(s) (concurrency={concurrency})")
         start = time.monotonic()
 
         renderer = _PerFileProgress(start) if sys.stderr.isatty() else None
@@ -139,8 +138,14 @@ class BoreholeAI:
             timeout=self._timeout,
             _transport=self._transport,
         ) as client:
+            # Pace ourselves to the server's per-user cap so we never
+            # send POSTs that would just be 429-rejected.
+            effective, server_cap = await resolve_effective_concurrency(client, concurrency)
+            if server_cap is not None and server_cap < concurrency:
+                _log(f"Server concurrency cap: {server_cap} (your concurrency={concurrency} capped)")
+            _log(f"Starting {len(files)} file(s) (concurrency={effective})")
             return await run_batch(
-                client, files, output_dir, concurrency=concurrency,
+                client, files, output_dir, concurrency=effective,
                 on_progress=renderer.update if renderer else None,
             )
 
