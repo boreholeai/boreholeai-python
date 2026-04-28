@@ -40,7 +40,7 @@ from boreholeai.exceptions import (
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_CONCURRENCY = 6
+_DEFAULT_CONCURRENCY = 10
 
 _POLL_INITIAL_INTERVAL = 2.0
 _POLL_MAX_INTERVAL = 10.0
