@@ -46,12 +46,12 @@ _POLL_INITIAL_INTERVAL = 2.0
 _POLL_MAX_INTERVAL = 10.0
 _POLL_BACKOFF_FACTOR = 1.5
 
-# Submit retries cover both transient errors and per-user concurrency-cap
-# 429s (server enforces a per-user cap; the SDK is expected to wait it out
-# while in-flight jobs drain). With backoff base=2s, factor=2x, max=60s,
-# the cumulative wait time across 20 retries is ~16 minutes — comfortably
-# longer than typical ML-pipeline job durations of 1–3 minutes.
-_SUBMIT_MAX_RETRIES = 20
+# Submit retries — safety net for genuine transient errors (5xx, brief
+# network blips). With cap-aware client-side pacing (see run_batch's
+# call to client.get_me()) the SDK normally never sends a POST that
+# would be 429'd by the cap. So 5 retries with exponential backoff is
+# enough; we don't need to wait out long server queues here.
+_SUBMIT_MAX_RETRIES = 5
 _SUBMIT_RETRY_BASE = 2.0
 _SUBMIT_RETRY_MAX = 60.0
 
@@ -83,6 +83,11 @@ async def run_batch(
     interrupted run can resume by re-invoking with the same arguments.
     Does NOT call merge — caller decides when to merge across the
     workdir.
+
+    Caller is expected to have already passed an effective `concurrency`
+    that respects the server's per-user cap (see
+    `resolve_effective_concurrency`). `run_batch` itself does not call
+    `/v1/me`.
 
     `on_progress` (optional): called with the current Manifest after every
     state change. Used by `client.py` to render a per-file progress display.
@@ -319,6 +324,44 @@ def _emit_progress(
         cb(manifest)
     except Exception:
         logger.debug("progress callback raised", exc_info=True)
+
+
+async def resolve_effective_concurrency(
+    client: APIClientAsync, user_concurrency: int,
+) -> tuple[int, Optional[int]]:
+    """Decide the SDK's submit-semaphore size, capped by the server.
+
+    Calls GET /v1/me. Returns (effective_concurrency, server_cap_or_None).
+    On 4xx/5xx or network errors, falls back to `user_concurrency`,
+    returning (user_concurrency, None) — the safety-net 429 retries
+    in `_submit_one` will catch any cap-overshoot.
+
+    Raises `BoreholeAIError` if the server reports cap=0 (admin lockout).
+    """
+    try:
+        info = await client.get_me()
+    except Exception as exc:
+        logger.warning(
+            "could not fetch server concurrency cap (%s) — using "
+            "concurrency=%d; cap-rejected requests will retry on 429",
+            exc, user_concurrency,
+        )
+        return user_concurrency, None
+
+    server_cap = info.get("max_concurrent_jobs")
+    if server_cap == 0:
+        raise BoreholeAIError(
+            "your account has no concurrency budget "
+            "(max_concurrent_jobs = 0); contact support"
+        )
+    if not isinstance(server_cap, int) or server_cap < 1:
+        logger.warning(
+            "server returned unexpected max_concurrent_jobs=%r — "
+            "using concurrency=%d", server_cap, user_concurrency,
+        )
+        return user_concurrency, None
+
+    return min(user_concurrency, server_cap), server_cap
 
 
 def _build_result(

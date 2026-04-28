@@ -7,6 +7,7 @@ to simulate a fake server with controllable per-job behavior.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 import httpx
 import pytest
@@ -34,17 +35,20 @@ class FakeServer:
         submit_429_count: int = 0,
         auth_fails: bool = False,
         purge_jobs: set[str] = frozenset(),
+        max_concurrent_jobs: Optional[int] = None,
     ):
         self._complete_after = complete_after_polls
         self._fail_jobs = set(fail_jobs)
         self._submit_429_remaining = submit_429_count
         self._auth_fails = auth_fails
         self._purge_jobs = set(purge_jobs)
+        self._max_concurrent_jobs = max_concurrent_jobs
         # state
         self.jobs: dict[str, dict] = {}    # job_id -> {filename, polls, status}
         self.next_id = 0
         self.post_count = 0
         self.delete_count = 0
+        self.me_count = 0
 
     def transport(self) -> httpx.MockTransport:
         return httpx.MockTransport(self._handle)
@@ -53,6 +57,16 @@ class FakeServer:
         path = req.url.path
         if path == "/health":
             return httpx.Response(200, json={"ok": True})
+
+        if path == "/v1/me":
+            self.me_count += 1
+            if self._max_concurrent_jobs is None:
+                return httpx.Response(404)  # simulate endpoint missing
+            return httpx.Response(200, json={
+                "user_id": "fake-user",
+                "max_concurrent_jobs": self._max_concurrent_jobs,
+                "purge_on_download": False,
+            })
 
         # Signed-URL downloads come through the same transport
         if req.url.host.startswith("dl.fake"):
@@ -288,3 +302,44 @@ async def test_empty_input_raises(tmp_path):
     async with _client(server) as client:
         with pytest.raises(ValueError):
             await run_batch(client, [], tmp_path / "out")
+
+
+# --- cap-aware pacing (resolve_effective_concurrency) ---
+
+async def test_resolve_effective_concurrency_uses_server_cap_when_lower(tmp_path):
+    from boreholeai._batch import resolve_effective_concurrency
+    server = FakeServer(max_concurrent_jobs=2)
+    async with _client(server) as client:
+        effective, server_cap = await resolve_effective_concurrency(client, user_concurrency=10)
+    assert effective == 2
+    assert server_cap == 2
+    assert server.me_count == 1
+
+
+async def test_resolve_effective_concurrency_keeps_user_when_lower(tmp_path):
+    from boreholeai._batch import resolve_effective_concurrency
+    server = FakeServer(max_concurrent_jobs=10)
+    async with _client(server) as client:
+        effective, server_cap = await resolve_effective_concurrency(client, user_concurrency=3)
+    assert effective == 3
+    assert server_cap == 10
+
+
+async def test_resolve_effective_concurrency_falls_back_when_endpoint_missing(tmp_path):
+    """If /v1/me returns 404 (older backend), don't break — use user value."""
+    from boreholeai._batch import resolve_effective_concurrency
+    server = FakeServer(max_concurrent_jobs=None)  # endpoint returns 404
+    async with _client(server) as client:
+        effective, server_cap = await resolve_effective_concurrency(client, user_concurrency=6)
+    assert effective == 6
+    assert server_cap is None
+
+
+async def test_resolve_effective_concurrency_zero_cap_raises(tmp_path):
+    """A cap of 0 means the account is locked out — fail clearly."""
+    from boreholeai._batch import resolve_effective_concurrency
+    from boreholeai.exceptions import BoreholeAIError
+    server = FakeServer(max_concurrent_jobs=0)
+    async with _client(server) as client:
+        with pytest.raises(BoreholeAIError, match="no concurrency budget"):
+            await resolve_effective_concurrency(client, user_concurrency=6)
