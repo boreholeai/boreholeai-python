@@ -311,10 +311,13 @@ class _PerFileProgress:
 
         # Frame-rate cap: ~4 fps unless every file has reached a terminal
         # state, in which case we always draw the FINAL frame so the user
-        # sees the last update before the renderer goes silent.
+        # sees the last update before the renderer goes silent. "Terminal"
+        # for a COMPLETED file requires `downloaded=True` — otherwise we'd
+        # latch the final frame mid-download on the last file and miss the
+        # `downloading… → ✓ done` transition.
         all_terminal = all(
             (manifest.jobs.get(name) is None) or
-            (manifest.jobs[name].status in (STATUS_COMPLETED, STATUS_FAILED, STATUS_SUBMIT_FAILED))
+            _file_is_terminal(manifest.jobs[name])
             for name in self._order
         )
         if not all_terminal and now - self._last_render_at < _RENDER_MIN_INTERVAL:
@@ -427,3 +430,16 @@ def _bar_processing(entry, elapsed_in_sg: float) -> str:
 def _bar_full() -> str:
     """Bar at 100% — only shown when status is `completed`."""
     return f"[{_BAR_FILL * _BAR_WIDTH}] 100%"
+
+
+def _file_is_terminal(entry) -> bool:
+    """A file is fully terminal once it can't change visually anymore.
+
+    Failed files are terminal as soon as status flips. Completed files
+    only count as terminal once `downloaded=True` — without this, the
+    renderer would latch its final frame the moment the last file's
+    poll ends, swallowing the `downloading… → ✓ done` transition.
+    """
+    if entry.status in (STATUS_FAILED, STATUS_SUBMIT_FAILED):
+        return True
+    return entry.status == STATUS_COMPLETED and entry.downloaded
