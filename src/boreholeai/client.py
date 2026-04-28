@@ -156,7 +156,7 @@ class BoreholeAI:
             # Pace ourselves to the server's per-user cap so we never
             # send POSTs that would just be 429-rejected.
             effective, _ = await resolve_effective_concurrency(client, concurrency)
-            _log(f"Starting {len(files)} file(s) (concurrency={effective})")
+            _log(f"🟢 Starting {len(files)} file(s) (concurrency={effective})")
             return await run_batch(
                 client, files, output_dir, concurrency=effective,
                 on_progress=renderer.update if renderer else None,
@@ -208,7 +208,7 @@ class BoreholeAI:
         if merged_files:
             _log(f"🟢 Saved {len(merged_files)} file(s) to {output_dir}")
             for f in merged_files:
-                _log(f"  {f.filename}")
+                _log(f"      {f.filename}")
 
         purged_count = sum(
             1 for e in (batch.manifest.jobs.values() if batch.manifest else [])
@@ -342,7 +342,7 @@ class _PerFileProgress:
             elapsed = now - self._file_started.get(name, now)
             elapsed_in_sg = self._elapsed_in_current_sg(name, entry, now)
             line = self._format_line(name, entry, max_name_len, elapsed, elapsed_in_sg)
-            sys.stderr.write(f"\r\033[K  {line}\n")
+            sys.stderr.write(f"\r\033[K        {line}\n")
             rendered += 1
 
         sys.stderr.flush()
