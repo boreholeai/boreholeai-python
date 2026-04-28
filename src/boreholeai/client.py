@@ -30,7 +30,7 @@ from boreholeai._version import __version__, __version_date__
 from boreholeai._types import FileResult, JobResult
 
 _DEFAULT_OUTPUT_DIR = "./results"
-_DEFAULT_CONCURRENCY = 6
+_DEFAULT_CONCURRENCY = 10
 
 _BAR_WIDTH = 20
 _BAR_FILL = "█"
@@ -66,11 +66,11 @@ class BoreholeAI:
         result = client.process_documents("borehole.pdf")
 
         # Folder — fans out to N concurrent server jobs, merges results
-        result = client.process_documents("./logs/", output_dir="./results", concurrency=6)
+        result = client.process_documents("./logs/", output_dir="./results")
 
-    For a folder of N files, this submits N concurrent jobs (bounded by
-    `concurrency`), polls each, downloads all outputs, then produces one
-    merged ground_profile / test_data / AGS file.
+    For a folder of N files, this processes them in parallel, downloads
+    all outputs, then produces one merged ground_profile / test_data / AGS
+    file.
 
     Resumes automatically if interrupted: re-running with the same
     `output_dir` skips already-completed work.
@@ -109,7 +109,6 @@ class BoreholeAI:
         input_path: str | Path,
         *,
         output_dir: str | Path = _DEFAULT_OUTPUT_DIR,
-        concurrency: int = _DEFAULT_CONCURRENCY,
     ) -> JobResult:
         """Submit, process, and merge a single file or a folder of files.
 
@@ -119,7 +118,6 @@ class BoreholeAI:
             output_dir: Where merged results land. Created if missing.
                 If `.boreholeai_manifest.json` is present from a prior run,
                 that work is resumed; already-completed files are skipped.
-            concurrency: Max in-flight POSTs and downloads (default 6).
 
         Returns:
             JobResult — `status` is "completed", "partial", or "failed";
@@ -137,7 +135,7 @@ class BoreholeAI:
 
         renderer = _PerFileProgress(start) if sys.stderr.isatty() else None
         try:
-            batch = asyncio.run(self._run(files, out, concurrency, renderer))
+            batch = asyncio.run(self._run(files, out, _DEFAULT_CONCURRENCY, renderer))
         finally:
             if renderer is not None:
                 renderer.finalise()
@@ -157,9 +155,7 @@ class BoreholeAI:
         ) as client:
             # Pace ourselves to the server's per-user cap so we never
             # send POSTs that would just be 429-rejected.
-            effective, server_cap = await resolve_effective_concurrency(client, concurrency)
-            if server_cap is not None and server_cap < concurrency:
-                _log(f"Server concurrency cap: {server_cap} (your concurrency={concurrency} capped)")
+            effective, _ = await resolve_effective_concurrency(client, concurrency)
             _log(f"Starting {len(files)} file(s) (concurrency={effective})")
             return await run_batch(
                 client, files, output_dir, concurrency=effective,

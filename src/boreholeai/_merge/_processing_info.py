@@ -99,9 +99,12 @@ def build_merged_processing_info(
     ]
 
     if failed_list:
+        rows.append(("", ""))
         rows.append(("— Failed Boreholes —", ""))
+        rows.append(("", ""))
         for name in failed_list:
             rows.append((f"  {name}", ""))
+        rows.append(("", ""))
 
     rows.extend([
         ("Total Pages Processed", str(total_pages)),

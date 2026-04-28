@@ -37,6 +37,8 @@ _DATA_BORDER = Border(
 _ALT_ROW_FILL = PatternFill(fill_type="solid", fgColor="FFF8F9FA")
 _FLAGGED_FILL = PatternFill(fill_type="solid", fgColor="FFFFEB9C")
 _FLAGGED_FONT = Font(color="FF9C6500")
+_FAILED_HEADER_FONT = Font(bold=True, color="FFCC0000", size=11)
+_FAILED_NAME_FILL = PatternFill(fill_type="solid", fgColor="FFFFFF00")
 
 _LEFT_ALIGN_COLS = frozenset({
     "Metric", "Value", "material", "material_type", "parent_rock",
@@ -105,6 +107,8 @@ def merge_excel_files(paths: Iterable[Path]) -> bytes:
     # Apply styling to every sheet (including Processing Info).
     for sheet in merged.worksheets:
         _apply_styles(sheet)
+        if sheet.title == "Processing Info":
+            _style_processing_info(sheet)
 
     buf = io.BytesIO()
     merged.save(buf)
@@ -182,3 +186,25 @@ def _apply_styles(sheet: Worksheet) -> None:
 
     # Freeze header row.
     sheet.freeze_panes = "A2"
+
+
+def _style_processing_info(sheet: Worksheet) -> None:
+    """Red+bold on '— Failed Boreholes —', yellow fill on failed-name rows.
+
+    Mirrors backend `_style_processing_info` in
+    `Agentic 06/.../data_processing_utils.py`. Runs after `_apply_styles`
+    so the yellow fill overrides the alt-row gray.
+    """
+    in_failed_section = False
+    for r in range(2, sheet.max_row + 1):
+        cell_value = str(sheet.cell(row=r, column=1).value or "")
+        if cell_value == "— Failed Boreholes —":
+            sheet.cell(row=r, column=1).font = _FAILED_HEADER_FONT
+            in_failed_section = True
+            continue
+        if in_failed_section:
+            if cell_value.startswith("  ") and cell_value.strip():
+                sheet.cell(row=r, column=1).fill = _FAILED_NAME_FILL
+                sheet.cell(row=r, column=2).fill = _FAILED_NAME_FILL
+            elif cell_value.strip() and not cell_value.startswith("  "):
+                in_failed_section = False
