@@ -3,6 +3,18 @@
 All notable changes to the BoreholeAI Python SDK are documented here.
 The project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.4.5 — 2026-04-28
+
+### Fixed
+
+- **Cap-aware pacing now actually paces correctly.** 0.4.4's semaphore only covered the HTTP submit call, so as soon as a POST returned 202 the slot was "released" client-side even though the server still considered the job in-flight. With cap=1 + 3 files, the SDK would submit file 1 successfully then immediately get 429s on files 2 & 3. Fix: the cap-semaphore is now held from POST through to the server-side terminal status (`completed` / `failed`), so file B can't even attempt to submit until file A's slot has freed on the server. With cap=1 the SDK correctly serializes file submissions one-at-a-time, and with cap=N submits exactly N at a time. No more "submit failed (Rate limited)" lines on cap-blocked batches.
+- **`Update available` banner no longer fires on backend lag.** Previously `if latest != current` triggered the warning even when the backend reported an OLDER version than the running SDK (e.g. backend says 0.4.0, SDK is 0.4.5 → "Update available: 0.4.0 (you have 0.4.5)" — nonsense). Now uses semver-aware comparison and only nudges when the server reports a strictly newer version.
+
+### Changed
+
+- **Per-file lifecycle: download starts as soon as a file's job completes**, in parallel with the next file's submission. Previously every file waited for ALL polls to finish before any download began. Result: less to lose mid-batch on Ctrl-C, enterprise purge happens sooner per file, and downloads of completed files overlap with submissions of pending ones for better wall-clock time. Cap-semaphore is held only through submit+poll (where the server cap matters); download runs under a separate semaphore that just bounds bandwidth.
+- **Manifest and workdir are removed on full success.** `output_dir/.boreholeai_manifest.json` and `output_dir/.boreholeai_workdir/` were already being preserved after every run. Now they're cleaned up automatically when `result.status == "completed"` so the output directory contains only user-facing merged results. Both are still kept on `partial` / `failed` runs so re-running can resume.
+
 ## 0.4.4 — 2026-04-28
 
 ### Changed

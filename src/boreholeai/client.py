@@ -25,6 +25,7 @@ from boreholeai._manifest import (
     Manifest,
 )
 from boreholeai._merge import merge_results
+from boreholeai._progress import compute_progress
 from boreholeai._version import __version__, __version_date__
 from boreholeai._types import FileResult, JobResult
 
@@ -204,10 +205,15 @@ class BoreholeAI:
         if purged_count:
             _log(f"🔴 Server files deleted for {purged_count} job(s) (enterprise purge-on-download)")
 
-        # Clean up the per-job workdir only when everything succeeded.
-        # On partial/failed runs we keep it so the user can inspect or resume.
-        if status == "completed" and batch.workdir is not None and batch.workdir.exists():
-            shutil.rmtree(batch.workdir, ignore_errors=True)
+        # Clean up the per-job workdir AND the manifest only when everything
+        # succeeded. On partial/failed runs we keep both so the user can
+        # inspect or resume the run.
+        if status == "completed":
+            if batch.workdir is not None and batch.workdir.exists():
+                shutil.rmtree(batch.workdir, ignore_errors=True)
+            manifest_path = output_dir / ".boreholeai_manifest.json"
+            if manifest_path.exists():
+                manifest_path.unlink()
 
         primary_job_id = next(iter(batch.job_ids.values()), "")
         total_pages = sum(
@@ -267,6 +273,12 @@ class _PerFileProgress:
         # Capture filename order from first update so lines stay stable
         self._order: list[str] = []
         self._file_started: dict[str, float] = {}
+        # Per-file: number of completed_subgraphs at last observation, and
+        # the timestamp at which that number first appeared. Used by the
+        # progress bar to compute "elapsed since last subgraph change" so
+        # `_progress.compute_progress` can interpolate inside the current
+        # subgraph. Mirrors `sgStartTimes` in frontend's use-job-progress.ts.
+        self._sg_state: dict[str, tuple[int, float]] = {}
 
     def update(self, manifest: Manifest) -> None:
         """Re-draw all per-file lines based on current manifest state."""
@@ -294,12 +306,27 @@ class _PerFileProgress:
             if entry is None:
                 continue
             elapsed = now - self._file_started.get(name, now)
-            line = self._format_line(name, entry, max_name_len, elapsed)
+            elapsed_in_sg = self._elapsed_in_current_sg(name, entry, now)
+            line = self._format_line(name, entry, max_name_len, elapsed, elapsed_in_sg)
             sys.stderr.write(f"\r\033[K  {line}\n")
             rendered += 1
 
         sys.stderr.flush()
         self._lines_drawn = rendered
+
+    def _elapsed_in_current_sg(self, name: str, entry, now: float) -> float:
+        """Seconds since the last time `entry.completed_subgraphs` grew.
+
+        Resets the timer whenever a new subgraph completes, so the bar's
+        within-subgraph interpolation in `_progress.compute_progress`
+        starts fresh on each transition.
+        """
+        count = len(entry.completed_subgraphs or [])
+        last = self._sg_state.get(name)
+        if last is None or last[0] != count:
+            self._sg_state[name] = (count, now)
+            return 0.0
+        return now - last[1]
 
     def finalise(self) -> None:
         """Leave the last frame in place; subsequent _log calls print below it."""
@@ -308,28 +335,33 @@ class _PerFileProgress:
         self._lines_drawn = 0
 
     def _format_line(
-        self, name: str, entry, name_width: int, elapsed: float,
+        self, name: str, entry, name_width: int,
+        elapsed: float, elapsed_in_sg: float,
     ) -> str:
         truncated = name if len(name) <= name_width else name[: name_width - 1] + "…"
         padded = truncated.ljust(name_width)
         time_str = _fmt_progress(elapsed) if entry.status != STATUS_PENDING else "—"
-        body = self._status_body(entry)
+        body = self._status_body(entry, elapsed_in_sg)
         return f"{padded}  {body}  [{time_str}]"
 
-    def _status_body(self, entry) -> str:
+    def _status_body(self, entry, elapsed_in_sg: float) -> str:
         s = entry.status
         if s == STATUS_PENDING:
-            return "waiting to submit"
+            # With cap-aware pacing, files in the PENDING state are held by
+            # the SDK's submit semaphore — waiting for a server-side slot to
+            # free up before being POSTed. Make that explicit so users don't
+            # think the SDK is stuck.
+            return "queued (waiting for slot)"
         if s == STATUS_SUBMITTED:
             return "submitted, waiting for worker"
         if s == STATUS_QUEUED:
             return "queued, waiting for worker"
         if s == STATUS_PROCESSING:
-            return _bar(entry.pages_done, entry.num_pages or 0)
+            return _bar_processing(entry, elapsed_in_sg)
         if s == STATUS_COMPLETED:
             if entry.downloaded:
                 return "✓ done"
-            return "completed, downloading…"
+            return _bar_full() + "  downloading…"
         if s == STATUS_FAILED:
             return f"✗ failed ({entry.error or 'unknown error'})"
         if s == STATUS_SUBMIT_FAILED:
@@ -337,12 +369,26 @@ class _PerFileProgress:
         return s
 
 
-def _bar(done: int, total: int) -> str:
-    """Render a fixed-width filled-bar with N/M page count."""
-    if total <= 0:
-        # We don't know total yet — show indeterminate bar
-        return f"[{_BAR_EMPTY * _BAR_WIDTH}] processing"
-    pct = min(1.0, done / total)
-    filled = int(pct * _BAR_WIDTH)
+def _bar_processing(entry, elapsed_in_sg: float) -> str:
+    """Render the bar using the weighted-subgraph algorithm shared with
+    the frontend (see `_progress.compute_progress`).
+
+    Bar fills smoothly across subgraphs; never reaches 100% until status
+    flips to "completed" (`_bar_full` handles that).
+    """
+    pages_total = entry.pages_total or entry.num_pages or 1
+    pct = compute_progress(
+        page=entry.current_page or 1,
+        pages_total=pages_total,
+        completed_subgraphs=entry.completed_subgraphs or [],
+        elapsed_in_current_sg=elapsed_in_sg,
+    )
+    pct_clamped = max(0.0, min(99.0, pct))
+    filled = int((pct_clamped / 100.0) * _BAR_WIDTH)
     bar = _BAR_FILL * filled + _BAR_EMPTY * (_BAR_WIDTH - filled)
-    return f"[{bar}] {done}/{total} pages"
+    return f"[{bar}] {int(pct_clamped)}%"
+
+
+def _bar_full() -> str:
+    """Bar at 100% — only shown when status is `completed`."""
+    return f"[{_BAR_FILL * _BAR_WIDTH}] 100%"
