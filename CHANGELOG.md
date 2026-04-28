@@ -3,6 +3,16 @@
 All notable changes to the BoreholeAI Python SDK are documented here.
 The project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.4.6 — 2026-04-28
+
+### Security
+
+- **ANSI / control-character injection from filenames is now defanged.** The progress renderer was writing input filenames straight to stderr inside ANSI sequences. A file named e.g. `evil\x1b[2J\x1b[Hfake.pdf` would cause the user's terminal to clear and could be used to spoof "completed" output. Filenames now have `\x00–\x1f` and `\x7f` characters substituted with `?` before printing.
+
+### Performance
+
+- **Progress display throttled to ~4 fps.** With dozens of files in a batch, manifest events were firing several times per second per file, triggering a full ANSI redraw of every line each time. Slow terminals (SSH, recordings) could stutter visibly. The renderer now skips frames more frequent than 250 ms apart, but always draws the FINAL frame so the user sees the last state. No effect on small batches.
+
 ## 0.4.5 — 2026-04-28
 
 ### Fixed
