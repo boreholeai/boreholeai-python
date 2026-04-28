@@ -46,7 +46,12 @@ _POLL_INITIAL_INTERVAL = 2.0
 _POLL_MAX_INTERVAL = 10.0
 _POLL_BACKOFF_FACTOR = 1.5
 
-_SUBMIT_MAX_RETRIES = 5
+# Submit retries cover both transient errors and per-user concurrency-cap
+# 429s (server enforces a per-user cap; the SDK is expected to wait it out
+# while in-flight jobs drain). With backoff base=2s, factor=2x, max=60s,
+# the cumulative wait time across 20 retries is ~16 minutes — comfortably
+# longer than typical ML-pipeline job durations of 1–3 minutes.
+_SUBMIT_MAX_RETRIES = 20
 _SUBMIT_RETRY_BASE = 2.0
 _SUBMIT_RETRY_MAX = 60.0
 
