@@ -285,6 +285,12 @@ class _PerFileProgress:
         # Capture filename order from first update so lines stay stable
         self._order: list[str] = []
         self._file_started: dict[str, float] = {}
+        # Frozen end-time for files that have reached a terminal state.
+        # Without this, the displayed elapsed clock keeps ticking on
+        # already-done files because `now - started` is recomputed each
+        # frame. We capture `now` at the first terminal observation and
+        # reuse it forever after.
+        self._file_ended: dict[str, float] = {}
         # Per-file: number of completed_subgraphs at last observation, and
         # the timestamp at which that number first appeared. Used by the
         # progress bar to compute "elapsed since last subgraph change" so
@@ -308,6 +314,9 @@ class _PerFileProgress:
             # Track when each file's clock started (first non-pending state).
             if name not in self._file_started and entry.status != STATUS_PENDING:
                 self._file_started[name] = now
+            # Freeze each file's clock at its first terminal observation.
+            if name not in self._file_ended and _file_is_terminal(entry):
+                self._file_ended[name] = now
 
         # Frame-rate cap: ~4 fps unless every file has reached a terminal
         # state, in which case we always draw the FINAL frame so the user
@@ -339,7 +348,8 @@ class _PerFileProgress:
             entry = manifest.jobs.get(name)
             if entry is None:
                 continue
-            elapsed = now - self._file_started.get(name, now)
+            end_time = self._file_ended.get(name, now)
+            elapsed = end_time - self._file_started.get(name, now)
             elapsed_in_sg = self._elapsed_in_current_sg(name, entry, now)
             line = self._format_line(name, entry, max_name_len, elapsed, elapsed_in_sg)
             sys.stderr.write(f"\r\033[K        {line}\n")
