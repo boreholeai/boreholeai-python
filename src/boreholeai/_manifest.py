@@ -42,13 +42,18 @@ class JobEntry:
 
     job_id: Optional[str] = None
     num_pages: Optional[int] = None
-    pages_done: int = 0                 # updated from poll responses; for live progress
+    pages_done: int = 0                 # legacy; kept for back-compat manifests
     status: str = STATUS_PENDING
     downloaded: bool = False
     purged: bool = False                # only meaningful if API key has purge_on_download
     error: Optional[str] = None
     submitted_at: Optional[str] = None
     completed_at: Optional[str] = None
+    # Live-progress fields, populated from poll responses' `progress` JSONB.
+    # Drive the per-file progress renderer (client.py) via `_progress.py`.
+    current_page: int = 1
+    pages_total: int = 1
+    completed_subgraphs: list[str] = field(default_factory=list)
 
 
 @dataclass

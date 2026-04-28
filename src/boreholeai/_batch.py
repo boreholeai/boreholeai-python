@@ -108,35 +108,64 @@ async def run_batch(
         output_dir, input_root=input_root, concurrency=concurrency, files=files,
     )
     save_lock = asyncio.Lock()
-    sem = asyncio.Semaphore(concurrency)
+    cap_sem = asyncio.Semaphore(concurrency)         # gates server-side cap
+    download_sem = asyncio.Semaphore(concurrency)    # bounds download bandwidth
 
     files_by_name = {f.name: f for f in files}
 
     # Initial render so users see all files in their starting state
     _emit_progress(on_progress, manifest)
 
-    # PHASE 1 — SUBMIT
+    # Per-file lifecycle: submit → poll under cap_sem (matches server cap),
+    # then download under download_sem (separate — once a job hits a terminal
+    # status it no longer consumes the server cap, so we don't have to hold
+    # cap_sem through download). Result: file 1's download runs in parallel
+    # with file 2's submit+poll, instead of serializing.
     await asyncio.gather(*(
-        _submit_one(name, files_by_name[name], client, sem, manifest, save_lock, output_dir, on_progress)
+        _process_one(
+            name, files_by_name[name], client,
+            cap_sem, download_sem,
+            manifest, save_lock, output_dir, workdir, on_progress,
+        )
         for name in files_by_name
-        if manifest.needs_submit(name)
-    ))
-
-    # PHASE 2 — POLL
-    await asyncio.gather(*(
-        _poll_one(name, client, manifest, save_lock, output_dir, on_progress)
-        for name in files_by_name
-        if manifest.needs_poll(name)
-    ))
-
-    # PHASE 3 — DOWNLOAD (and optional enterprise purge)
-    await asyncio.gather(*(
-        _download_one(name, client, sem, manifest, save_lock, output_dir, workdir, on_progress)
-        for name in files_by_name
-        if manifest.needs_download(name)
     ))
 
     return _build_result(manifest, files_by_name, workdir)
+
+
+async def _process_one(
+    name: str, file_path: Path, client: APIClientAsync,
+    cap_sem: asyncio.Semaphore, download_sem: asyncio.Semaphore,
+    manifest: Manifest, save_lock: asyncio.Lock,
+    output_dir: Path, workdir: Path,
+    on_progress: Optional[Callable[[Manifest], None]] = None,
+) -> None:
+    """Per-file lifecycle: submit → poll → download.
+
+    `cap_sem` is held across submit + poll only, so file B can't even
+    attempt to submit until file A reaches a terminal status on the server.
+    Download runs after `cap_sem` is released, under a separate semaphore
+    that bounds bandwidth without blocking the next file's submission.
+    """
+    # Submit + poll under cap_sem (server-side concurrency)
+    async with cap_sem:
+        if manifest.needs_submit(name):
+            await _submit_one(
+                name, file_path, client, manifest, save_lock, output_dir, on_progress,
+            )
+        # If submit succeeded, status is now SUBMITTED → needs_poll is True.
+        # If submit failed, no job_id was set → needs_poll is False, skip.
+        if manifest.needs_poll(name):
+            await _poll_one(
+                name, client, manifest, save_lock, output_dir, on_progress,
+            )
+
+    # Download under download_sem (no server cap consumed; just bandwidth)
+    if manifest.needs_download(name):
+        async with download_sem:
+            await _download_one(
+                name, client, manifest, save_lock, output_dir, workdir, on_progress,
+            )
 
 
 
@@ -147,16 +176,20 @@ async def run_batch(
 
 async def _submit_one(
     name: str, file_path: Path, client: APIClientAsync,
-    sem: asyncio.Semaphore, manifest: Manifest,
+    manifest: Manifest,
     save_lock: asyncio.Lock, output_dir: Path,
     on_progress: Optional[Callable[[Manifest], None]] = None,
 ) -> None:
-    """Submit one file with exponential-backoff retry on transient errors."""
+    """Submit one file with exponential-backoff retry on transient errors.
+
+    Caller is expected to hold the per-file semaphore (`_submit_and_poll`
+    wraps this in `async with sem:`) so the slot is reserved for the
+    entire submit + poll lifecycle, matching the server's cap semantics.
+    """
     delay = _SUBMIT_RETRY_BASE
     for attempt in range(1, _SUBMIT_MAX_RETRIES + 1):
         try:
-            async with sem:
-                data = await client.create_job([file_path])
+            data = await client.create_job([file_path])
             async with save_lock:
                 e = manifest.jobs[name]
                 e.job_id = data["job_id"]
@@ -227,13 +260,23 @@ async def _poll_one(
         async with save_lock:
             e = manifest.jobs[name]
             e.status = status
-            # Live page-progress for the renderer
-            pages_done = progress.get("pages_done")
+            # Live page + subgraph state for the renderer (drives the
+            # progress bar via _progress.compute_progress).
+            page = progress.get("page")
             pages_total = progress.get("pages_total")
+            completed = progress.get("completed_subgraphs")
+            if page is not None:
+                e.current_page = int(page)
+            if pages_total:
+                e.pages_total = int(pages_total)
+                if e.num_pages is None:
+                    e.num_pages = int(pages_total)
+            if completed is not None:
+                e.completed_subgraphs = list(completed)
+            # Legacy pages_done — kept up to date for older renderers.
+            pages_done = progress.get("pages_done")
             if pages_done is not None:
                 e.pages_done = int(pages_done)
-            if pages_total and e.num_pages is None:
-                e.num_pages = int(pages_total)
             if status == STATUS_FAILED:
                 e.error = data.get("error_message", "unknown error")
                 e.completed_at = _manifest._now()
@@ -254,13 +297,17 @@ async def _poll_one(
 
 
 async def _download_one(
-    name: str, client: APIClientAsync, sem: asyncio.Semaphore,
+    name: str, client: APIClientAsync,
     manifest: Manifest, save_lock: asyncio.Lock,
     output_dir: Path, workdir: Path,
     on_progress: Optional[Callable[[Manifest], None]] = None,
 ) -> None:
     """Fetch signed URLs, download every file into workdir/{job_id}/, and
-    optionally call DELETE for the enterprise purge-on-download flow."""
+    optionally call DELETE for the enterprise purge-on-download flow.
+
+    Caller is expected to hold the per-file download semaphore
+    (`_process_one` wraps this in `async with download_sem:`).
+    """
     job_id = manifest.jobs[name].job_id
     if job_id is None:
         return
@@ -268,49 +315,48 @@ async def _download_one(
     job_workdir = workdir / job_id
     job_workdir.mkdir(parents=True, exist_ok=True)
 
-    async with sem:
-        try:
-            results = await client.get_results(job_id)
-        except BoreholeAIError as exc:
-            async with save_lock:
-                manifest.jobs[name].error = f"results fetch failed: {exc}"
-                _manifest.save(manifest, output_dir)
-            _emit_progress(on_progress, manifest)
-            logger.error("results fetch failed for %s: %s", name, exc)
-            return
-
-        files_to_dl = results.get("files", [])
-        for f in files_to_dl:
-            try:
-                content = await client.download_file(f["url"])
-            except Exception as exc:
-                async with save_lock:
-                    manifest.jobs[name].error = f"download failed: {exc}"
-                    _manifest.save(manifest, output_dir)
-                _emit_progress(on_progress, manifest)
-                logger.error("download failed for %s: %s", name, exc)
-                return
-            (job_workdir / f["filename"]).write_bytes(content)
-
+    try:
+        results = await client.get_results(job_id)
+    except BoreholeAIError as exc:
         async with save_lock:
-            manifest.jobs[name].downloaded = True
+            manifest.jobs[name].error = f"results fetch failed: {exc}"
             _manifest.save(manifest, output_dir)
         _emit_progress(on_progress, manifest)
-        logger.info("downloaded %d file(s) for %s", len(files_to_dl), name)
+        logger.error("results fetch failed for %s: %s", name, exc)
+        return
 
-        if results.get("purge_on_download"):
-            try:
-                purge = await client.delete_job(job_id)
-                async with save_lock:
-                    manifest.jobs[name].purged = True
-                    _manifest.save(manifest, output_dir)
-                _emit_progress(on_progress, manifest)
-                logger.info(
-                    "purged %d server file(s) for %s",
-                    purge.get("files_deleted", 0), name,
-                )
-            except BoreholeAIError as exc:
-                logger.warning("purge failed for %s: %s", name, exc)
+    files_to_dl = results.get("files", [])
+    for f in files_to_dl:
+        try:
+            content = await client.download_file(f["url"])
+        except Exception as exc:
+            async with save_lock:
+                manifest.jobs[name].error = f"download failed: {exc}"
+                _manifest.save(manifest, output_dir)
+            _emit_progress(on_progress, manifest)
+            logger.error("download failed for %s: %s", name, exc)
+            return
+        (job_workdir / f["filename"]).write_bytes(content)
+
+    async with save_lock:
+        manifest.jobs[name].downloaded = True
+        _manifest.save(manifest, output_dir)
+    _emit_progress(on_progress, manifest)
+    logger.info("downloaded %d file(s) for %s", len(files_to_dl), name)
+
+    if results.get("purge_on_download"):
+        try:
+            purge = await client.delete_job(job_id)
+            async with save_lock:
+                manifest.jobs[name].purged = True
+                _manifest.save(manifest, output_dir)
+            _emit_progress(on_progress, manifest)
+            logger.info(
+                "purged %d server file(s) for %s",
+                purge.get("files_deleted", 0), name,
+            )
+        except BoreholeAIError as exc:
+            logger.warning("purge failed for %s: %s", name, exc)
 
 
 def _emit_progress(
