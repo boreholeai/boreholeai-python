@@ -74,13 +74,12 @@ for f in result.files:
 
 ## Folder / Batch Processing
 
-Pass a directory path to process multiple files together. The SDK fans out one server-side job per file (up to `concurrency` in flight at a time), polls each, downloads all outputs, then merges them locally into a single ground profile Excel, test data Excel, and AGS file. One annotated PDF per input file.
+Pass a directory path to process multiple files together. The SDK processes files in parallel and merges the outputs locally into a single ground profile Excel, test data Excel, and AGS file. One annotated PDF per input file.
 
 ```python
 result = client.process_documents(
     "./borehole_logs/",
     output_dir="./results",
-    concurrency=6,                  # max in-flight POSTs (default 6)
 )
 
 # Output:
