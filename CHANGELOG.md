@@ -3,7 +3,19 @@
 All notable changes to the BoreholeAI Python SDK are documented here.
 The project adheres to [Semantic Versioning](https://semver.org/).
 
-## 0.4.3 — 2026-04-28
+## 0.4.4 — 2026-04-28
+
+### Changed
+
+- **SDK now paces itself based on the server's per-user concurrency cap.** On every batch, the SDK calls a new `GET /v1/me` endpoint to learn its `max_concurrent_jobs` value, then sizes its submit semaphore to `min(your concurrency, server cap)`. This means a 50-file fan-out against a cap-of-2 account submits only 2 POSTs in flight at a time, queueing the rest client-side — no 429s, no wasted file reads, no retry storms. If `/v1/me` is unreachable, falls back to the user's `concurrency=` setting (and lets the existing 429 retry path handle any cap-overshoot). Logs the effective concurrency to stderr at the start of each batch.
+
+- **Submit retry budget restored to 5** (was briefly 20 in unpublished 0.4.3). With cap-aware pacing, 429s are now an exception rather than the steady state, so the budget only needs to cover genuine transient errors.
+
+### Skipped
+
+- **0.4.3 was not published to PyPI.** It bumped the retry budget to 20 as a stop-gap to make cap-blocked batches eventually succeed via retry. Replaced by 0.4.4's cleaner cap-aware pacing.
+
+## 0.4.3 — 2026-04-28 (unpublished)
 
 ### Fixed
 
