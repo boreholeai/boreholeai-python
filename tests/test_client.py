@@ -115,25 +115,35 @@ def test_total_failure_returns_failed_status(tmp_path, fast_polls):
     assert set(result.failures) == {"a.pdf", "b.pdf"}
 
 
-def test_resume_after_interrupt(tmp_path, fast_polls):
-    """Re-running with the same output_dir skips already-completed work."""
+def test_successful_run_deletes_manifest_and_workdir(tmp_path, fast_polls):
+    """On a fully successful run, both the manifest and workdir are removed
+    so output_dir contains only the user-facing results."""
     server = FakeServerWithAgs(complete_after_polls=1)
     indir = _input_dir(tmp_path, ["a.pdf", "b.pdf"])
 
     client = BoreholeAI(api_key="bhai_test", base_url="https://api1.boreholeai.com",
                          _transport=server.transport())
     out = tmp_path / "out"
-
-    # First run — both succeed. workdir is cleaned up on success, but the
-    # manifest stays, so a re-run should be a no-op (no new POSTs).
     client.process_documents(indir, output_dir=out)
-    posts_after_first = server.post_count
 
-    # Second run — manifest shows both done; should resubmit nothing.
-    # NOTE: workdir was cleaned up, so the actual workdir/<job_id> dirs
-    # are gone. Resume should still no-op rather than re-download.
-    client.process_documents(indir, output_dir=out)
-    assert server.post_count == posts_after_first  # zero new POSTs
+    assert not (out / ".boreholeai_manifest.json").exists()
+    assert not (out / ".boreholeai_workdir").exists()
+
+
+def test_partial_failure_keeps_manifest_for_resume(tmp_path, fast_polls):
+    """On partial failures, manifest + workdir are kept so the user can
+    re-run and resume (only the failed files get retried)."""
+    server = FakeServerWithAgs(complete_after_polls=1, fail_jobs={"b.pdf"})
+    indir = _input_dir(tmp_path, ["a.pdf", "b.pdf"])
+
+    client = BoreholeAI(api_key="bhai_test", base_url="https://api1.boreholeai.com",
+                         _transport=server.transport())
+    out = tmp_path / "out"
+    result = client.process_documents(indir, output_dir=out)
+
+    assert result.status == "partial"
+    assert (out / ".boreholeai_manifest.json").exists()
+    assert (out / ".boreholeai_workdir").exists()
 
 
 def test_concurrency_parameter_accepted(tmp_path, fast_polls):
