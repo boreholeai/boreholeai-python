@@ -124,6 +124,17 @@ class APIClientAsync:
         _raise_for_status(resp)
         return resp.json()
 
+    async def get_me(self) -> dict[str, Any]:
+        """GET /v1/me — per-user account info, including the server's
+        concurrency cap. The SDK fetches this once at batch start so it
+        can size its own submit semaphore and never send POSTs that
+        would be 429-rejected by the cap.
+        """
+        client = await self._connect()
+        resp = await client.get("/v1/me")
+        _raise_for_status(resp)
+        return resp.json()
+
     async def download_file(self, url: str) -> bytes:
         """Download a signed URL.
 
