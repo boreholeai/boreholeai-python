@@ -3,6 +3,12 @@
 All notable changes to the BoreholeAI Python SDK are documented here.
 The project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.4.7 — 2026-04-28
+
+### Fixed
+
+- **Progress display no longer accumulates zombie rows.** Internal `logger.warning` calls (e.g. transient `httpx.ReadTimeout` from polling) were falling through to Python's lastResort handler and printing to stderr mid-run, which pushed the renderer's cursor down without its knowledge — leaving stale file rows on screen as the next frame drew in the wrong position. Fix is the standard library practice for packages: attach a `NullHandler` to the `boreholeai` logger so log records don't reach stderr by default. Users who want SDK logs can still opt in via `logging.basicConfig(level=logging.INFO)` or any other handler config.
+
 ## 0.4.6 — 2026-04-28
 
 ### Security
