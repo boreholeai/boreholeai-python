@@ -156,7 +156,7 @@ class BoreholeAI:
             # Pace ourselves to the server's per-user cap so we never
             # send POSTs that would just be 429-rejected.
             effective, _ = await resolve_effective_concurrency(client, concurrency)
-            _log(f"🟢 Starting {len(files)} file(s) (concurrency={effective})")
+            _log(f"🟢 Starting {len(files)} file(s) (workers={effective})")
             return await run_batch(
                 client, files, output_dir, concurrency=effective,
                 on_progress=renderer.update if renderer else None,
