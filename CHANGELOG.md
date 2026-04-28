@@ -3,6 +3,12 @@
 All notable changes to the BoreholeAI Python SDK are documented here.
 The project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.4.3 — 2026-04-28
+
+### Fixed
+
+- **SDK now waits out per-user concurrency caps instead of giving up after ~30s.** When the backend enforces a per-user cap, a fan-out batch's "extra" files get 429 until in-flight jobs drain. The previous retry budget (5 attempts, ~30s of cumulative backoff) was much shorter than typical ML-pipeline job durations (1–3 minutes), so cap-blocked files were prematurely marked `submit_failed`. Bumped `_SUBMIT_MAX_RETRIES` to 20, giving roughly 16 minutes of patient retrying — comfortably longer than typical job durations. SDK behaviour during transient errors is unchanged.
+
 ## 0.4.2 — 2026-04-28
 
 ### Added
