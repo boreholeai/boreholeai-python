@@ -189,13 +189,19 @@ _update_warned = False
 
 
 def _check_sdk_version(resp: httpx.Response) -> None:
-    """Warn once if the server reports a newer SDK version."""
+    """Warn once if the server reports a STRICTLY newer SDK version.
+
+    The server's `X-SDK-Latest-Version` header is a hint maintained by hand;
+    it can lag behind the actual PyPI version. We only nudge the user to
+    upgrade when the server-reported version is genuinely higher than the
+    one they're running — never on equal or older values.
+    """
     global _update_warned
     if _update_warned:
         return
     try:
         latest = resp.headers.get("X-SDK-Latest-Version")
-        if latest and latest != __version__:
+        if latest and _is_strictly_newer(latest, __version__):
             _update_warned = True
             print(
                 f"  Update available: boreholeai {latest} (you have {__version__}). "
@@ -204,6 +210,19 @@ def _check_sdk_version(resp: httpx.Response) -> None:
             )
     except Exception:
         pass
+
+
+def _is_strictly_newer(candidate: str, current: str) -> bool:
+    """True iff `candidate` is a strictly higher semver than `current`.
+
+    Compares as tuples of ints. Any non-numeric component disables the
+    warning (defensive — better to under-warn than to nag falsely)."""
+    try:
+        return tuple(int(p) for p in candidate.split(".")) > tuple(
+            int(p) for p in current.split(".")
+        )
+    except (ValueError, AttributeError):
+        return False
 
 
 def _raise_for_status(resp: httpx.Response) -> None:
