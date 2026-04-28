@@ -36,6 +36,22 @@ _BAR_WIDTH = 20
 _BAR_FILL = "█"
 _BAR_EMPTY = "░"
 
+# Cap renderer redraws to ~4 fps so a chatty manifest (subgraph events
+# firing several times per second × N files) doesn't peg stderr or
+# stutter over slow terminals (SSH, recorders).
+_RENDER_MIN_INTERVAL = 0.25
+
+# Strip C0/C1 control characters from filenames before printing them, so
+# a malicious filename can't inject ANSI escape sequences into the user's
+# terminal (clear screen, hide cursor, OSC commands, etc.).
+_CONTROL_CHARS = "".join(chr(c) for c in range(0x00, 0x20)) + "\x7f"
+_CONTROL_TRANS = str.maketrans({c: "?" for c in _CONTROL_CHARS})
+
+
+def _safe_filename(name: str) -> str:
+    """Replace control characters in a filename for safe terminal display."""
+    return name.translate(_CONTROL_TRANS)
+
 
 class BoreholeAI:
     """Client for the BoreholeAI API.
@@ -279,6 +295,9 @@ class _PerFileProgress:
         # `_progress.compute_progress` can interpolate inside the current
         # subgraph. Mirrors `sgStartTimes` in frontend's use-job-progress.ts.
         self._sg_state: dict[str, tuple[int, float]] = {}
+        # Frame-rate cap state — see _RENDER_MIN_INTERVAL.
+        self._last_render_at: float = 0.0
+        self._final_frame_drawn: bool = False
 
     def update(self, manifest: Manifest) -> None:
         """Re-draw all per-file lines based on current manifest state."""
@@ -293,6 +312,22 @@ class _PerFileProgress:
             # Track when each file's clock started (first non-pending state).
             if name not in self._file_started and entry.status != STATUS_PENDING:
                 self._file_started[name] = now
+
+        # Frame-rate cap: ~4 fps unless every file has reached a terminal
+        # state, in which case we always draw the FINAL frame so the user
+        # sees the last update before the renderer goes silent.
+        all_terminal = all(
+            (manifest.jobs.get(name) is None) or
+            (manifest.jobs[name].status in (STATUS_COMPLETED, STATUS_FAILED, STATUS_SUBMIT_FAILED))
+            for name in self._order
+        )
+        if not all_terminal and now - self._last_render_at < _RENDER_MIN_INTERVAL:
+            return
+        if all_terminal and self._final_frame_drawn:
+            return
+        self._last_render_at = now
+        if all_terminal:
+            self._final_frame_drawn = True
 
         # Move cursor up to the top of the previously drawn block, clear,
         # then re-draw every line. Each redraw is one frame.
@@ -338,7 +373,11 @@ class _PerFileProgress:
         self, name: str, entry, name_width: int,
         elapsed: float, elapsed_in_sg: float,
     ) -> str:
-        truncated = name if len(name) <= name_width else name[: name_width - 1] + "…"
+        # Sanitise FIRST — defends against ANSI / OSC injection via
+        # adversarial filenames (e.g. clear-screen, cursor-move, OSC
+        # commands written by some terminals).
+        safe = _safe_filename(name)
+        truncated = safe if len(safe) <= name_width else safe[: name_width - 1] + "…"
         padded = truncated.ljust(name_width)
         time_str = _fmt_progress(elapsed) if entry.status != STATUS_PENDING else "—"
         body = self._status_body(entry, elapsed_in_sg)
