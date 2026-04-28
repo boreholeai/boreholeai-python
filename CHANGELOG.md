@@ -3,6 +3,22 @@
 All notable changes to the BoreholeAI Python SDK are documented here.
 The project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.5.0 — 2026-04-28
+
+### Breaking
+
+- **`process_documents()` no longer accepts `concurrency=`.** The SDK now uses a fixed default (10) and is automatically paced by your account's server-side limit, so callers don't have to think about a number. If you were passing `concurrency=…`, just remove the argument — the SDK already negotiated this with the server in 0.4.4+. Calls that still pass it will raise `TypeError`.
+
+### Changed
+
+- **Quieter startup output.** Dropped the `Server concurrency cap: X (your concurrency=Y capped)` stderr line — internal detail that wasn't useful to end users. The `Starting N file(s) (concurrency=…)` line still shows the effective value.
+- **Customer-facing copy cleaned up.** README, quickstart notebook, and class docstring rewritten to plain "processes files in parallel" — no leaks of internal terms like fan-out, server-side jobs, or worker pool tuning.
+- **`Borehole_processing_info` styling.** The "Failed Boreholes" section in the merged Processing Info sheet is now styled to match the backend: red+bold header, yellow fill on each failed name, blank separator rows above and below.
+
+### Removed
+
+- `examples/basic_usage.py`. The Jupyter notebook (`examples/quickstart.ipynb`) is the only example going forward.
+
 ## 0.4.7 — 2026-04-28
 
 ### Fixed
