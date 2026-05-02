@@ -72,11 +72,22 @@ class Manifest:
         return e is not None and e.status == STATUS_COMPLETED and e.downloaded
 
     def needs_submit(self, filename: str) -> bool:
-        """True if this file should be POSTed (or re-POSTed)."""
+        """True if this file should be POSTed (or re-POSTed).
+
+        Re-POSTs on resume for: never-submitted entries (PENDING),
+        entries whose POST itself errored (SUBMIT_FAILED), and entries
+        whose server-side processing failed (FAILED). The last case
+        treats server-side failures as transient by default — the
+        common cause is an LLM/network blip the user can ride through
+        by re-running the batch.
+        """
         e = self.jobs.get(filename)
         if e is None:
             return True
-        return e.status in (STATUS_PENDING, STATUS_SUBMIT_FAILED) or e.job_id is None
+        return (
+            e.status in (STATUS_PENDING, STATUS_SUBMIT_FAILED, STATUS_FAILED)
+            or e.job_id is None
+        )
 
     def needs_poll(self, filename: str) -> bool:
         """True if this file has a job_id but isn't terminal yet."""
