@@ -244,5 +244,5 @@ def _raise_for_status(resp: httpx.Response) -> None:
     if resp.status_code == 429:
         raise RateLimitError("Rate limited — please retry shortly", 429)
     if resp.status_code >= 500:
-        raise ServerError("Server error — please retry or contact support", resp.status_code)
-    raise BoreholeAIError(f"Request failed (HTTP {resp.status_code})", resp.status_code)
+        raise ServerError(detail or "Server error — please retry or contact support", resp.status_code)
+    raise BoreholeAIError(detail or f"Request failed (HTTP {resp.status_code})", resp.status_code)

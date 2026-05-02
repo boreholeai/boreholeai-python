@@ -154,15 +154,17 @@ def test_is_done_only_when_completed_and_downloaded(tmp_path):
     assert not m.is_done("missing")
 
 
-def test_needs_submit_for_pending_and_failed_post(tmp_path):
+def test_needs_submit_for_pending_failed_post_and_server_failed(tmp_path):
     m = Manifest(jobs={
         "a": JobEntry(status=STATUS_PENDING),
         "b": JobEntry(status=STATUS_SUBMIT_FAILED, error="429"),
         "c": JobEntry(status=STATUS_PROCESSING, job_id="uuid"),
+        "d": JobEntry(status=STATUS_FAILED, job_id="uuid", error="pipeline boom"),
     })
     assert m.needs_submit("a")
     assert m.needs_submit("b")
     assert not m.needs_submit("c")
+    assert m.needs_submit("d")  # server-side failure → retry on resume
     assert m.needs_submit("missing")  # any new file needs submit
 
 

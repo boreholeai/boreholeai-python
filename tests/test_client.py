@@ -73,7 +73,7 @@ def test_batch_completed_produces_merged_outputs(tmp_path, fast_polls):
 
     client = BoreholeAI(api_key="bhai_test", base_url="https://api1.boreholeai.com",
                          _transport=server.transport())
-    result = client.process_documents(indir, output_dir=tmp_path / "out", concurrency=2)
+    result = client.process_documents(indir, output_dir=tmp_path / "out")
 
     assert result.status == "completed"
     assert sorted(result.successes) == ["a.pdf", "b.pdf", "c.pdf"]
@@ -144,17 +144,6 @@ def test_partial_failure_keeps_manifest_for_resume(tmp_path, fast_polls):
     assert result.status == "partial"
     assert (out / ".boreholeai_manifest.json").exists()
     assert (out / ".boreholeai_workdir").exists()
-
-
-def test_concurrency_parameter_accepted(tmp_path, fast_polls):
-    server = FakeServerWithAgs(complete_after_polls=1)
-    indir = _input_dir(tmp_path, ["a.pdf"])
-
-    client = BoreholeAI(api_key="bhai_test", base_url="https://api1.boreholeai.com",
-                         _transport=server.transport())
-    result = client.process_documents(indir, output_dir=tmp_path / "out", concurrency=10)
-
-    assert result.status == "completed"
 
 
 def test_empty_api_key_rejected():
