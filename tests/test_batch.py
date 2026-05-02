@@ -271,6 +271,30 @@ async def test_resume_skips_already_done(files, tmp_path, fast_polls):
     assert "a.pdf" in result.successes
 
 
+async def test_resume_retries_server_side_failed_job(files, tmp_path, fast_polls):
+    """Manifest with status=failed should re-POST on resume (not stay sticky)."""
+    out = tmp_path / "out"
+    out.mkdir()
+
+    pre = _manifest.load_or_init(
+        out, input_root=tmp_path, concurrency=6, files=[files[0]],
+    )
+    pre.jobs["a.pdf"].job_id = "old-failed-job"
+    pre.jobs["a.pdf"].status = _manifest.STATUS_FAILED
+    pre.jobs["a.pdf"].error = "The write operation timed out"
+    _manifest.save(pre, out)
+
+    server = FakeServer(complete_after_polls=1)
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], out)
+
+    # Re-POSTed once and now succeeds; old job_id is replaced.
+    assert server.post_count == 1
+    assert result.successes == ["a.pdf"]
+    assert result.manifest.jobs["a.pdf"].job_id != "old-failed-job"
+    assert result.manifest.jobs["a.pdf"].error is None
+
+
 async def test_resume_continues_polling_existing_job(files, tmp_path, fast_polls):
     """Manifest with status=submitted + job_id should resume polling, not POST again."""
     out = tmp_path / "out"
