@@ -27,6 +27,7 @@ from typing import Optional
 
 from boreholeai._merge._ags import merge_ags_files
 from boreholeai._merge._excel import merge_excel_files
+from boreholeai._merge._json import merge_json_files
 
 logger = logging.getLogger(__name__)
 
@@ -82,12 +83,14 @@ def merge_results(
     ground_profile_paths: list[Path] = []
     test_data_paths: list[Path] = []
     ags_paths: list[Path] = []
+    json_paths: list[Path] = []
     annotated_pdfs: list[Path] = []
 
     for d in input_dirs:
         gp = _find_one(d, "Borehole_ground_profile*.xlsx")
         td = _find_one(d, "Borehole_test_data*.xlsx")
         ags = _find_one(d, "Borehole_ags4*.ags")
+        js = _find_one(d, "Borehole_data.json")
         label = _label(d)
 
         if gp is None:
@@ -104,6 +107,11 @@ def merge_results(
             result.warnings.append(f"{label}: no AGS file found")
         else:
             ags_paths.append(ags)
+
+        if js is None:
+            result.warnings.append(f"{label}: no Borehole_data JSON found")
+        else:
+            json_paths.append(js)
 
         annotated_pdfs.extend(sorted(d.glob("*_annotated.pdf")))
 
@@ -134,6 +142,15 @@ def merge_results(
             len(ags_paths), out,
         )
 
+    if json_paths:
+        out = output_dir / "Borehole_data_merged.json"
+        out.write_text(merge_json_files(json_paths), encoding="utf-8")
+        result.files.append(out)
+        logger.info(
+            "merged data JSON from %d file(s) → %s",
+            len(json_paths), out,
+        )
+
     for pdf in annotated_pdfs:
         dest = output_dir / pdf.name
         shutil.copy2(pdf, dest)
@@ -159,6 +176,7 @@ _RESULT_PATTERNS = (
     "Borehole_ground_profile*.xlsx",
     "Borehole_test_data*.xlsx",
     "Borehole_ags4*.ags",
+    "Borehole_data.json",
     "*_annotated.pdf",
 )
 
