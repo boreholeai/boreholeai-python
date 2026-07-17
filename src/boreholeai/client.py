@@ -12,7 +12,12 @@ from typing import Optional
 import httpx
 
 from boreholeai._api import APIClientAsync, DEFAULT_BASE_URL, DEFAULT_TIMEOUT
-from boreholeai._batch import BatchResult, resolve_effective_concurrency, run_batch
+from boreholeai._batch import (
+    _DEFAULT_CONCURRENCY,
+    BatchResult,
+    resolve_effective_concurrency,
+    run_batch,
+)
 from boreholeai._files import collect_files
 from boreholeai._manifest import (
     STATUS_COMPLETED,
@@ -30,7 +35,6 @@ from boreholeai._version import __version__, __version_date__
 from boreholeai._types import FileResult, JobResult
 
 _DEFAULT_OUTPUT_DIR = "./results"
-_DEFAULT_CONCURRENCY = 10
 
 _BAR_WIDTH = 20
 _BAR_FILL = "█"
