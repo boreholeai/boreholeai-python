@@ -42,6 +42,8 @@ def fast_polls(monkeypatch):
     monkeypatch.setattr(_batch, "_POLL_MAX_INTERVAL", 0.01)
     monkeypatch.setattr(_batch, "_SUBMIT_RETRY_BASE", 0.001)
     monkeypatch.setattr(_batch, "_SUBMIT_RETRY_MAX", 0.01)
+    monkeypatch.setattr(_batch, "_RATE_LIMIT_RETRY_BASE", 0.001)
+    monkeypatch.setattr(_batch, "_RATE_LIMIT_RETRY_MAX", 0.01)
 
 
 def _input_dir(tmp_path: Path, names: list[str]) -> Path:
