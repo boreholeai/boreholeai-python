@@ -26,6 +26,9 @@ class FakeServer:
       submit_429_count: first N POSTs return 429 (test rate-limit retry).
       auth_fails: if True, all POSTs return 401.
       purge_jobs: jobs whose `get_results` should set purge_on_download=True.
+      submit_neterr_count: first N POSTs raise a transport error.
+      poll_neterr_count: first N status GETs raise a transport error.
+      download_neterr_count: first N signed-URL GETs raise a transport error.
     """
 
     def __init__(
@@ -36,6 +39,9 @@ class FakeServer:
         auth_fails: bool = False,
         purge_jobs: set[str] = frozenset(),
         max_concurrent_jobs: Optional[int] = None,
+        submit_neterr_count: int = 0,
+        poll_neterr_count: int = 0,
+        download_neterr_count: int = 0,
     ):
         self._complete_after = complete_after_polls
         self._fail_jobs = set(fail_jobs)
@@ -43,6 +49,9 @@ class FakeServer:
         self._auth_fails = auth_fails
         self._purge_jobs = set(purge_jobs)
         self._max_concurrent_jobs = max_concurrent_jobs
+        self._submit_neterr_remaining = submit_neterr_count
+        self._poll_neterr_remaining = poll_neterr_count
+        self._download_neterr_remaining = download_neterr_count
         # state
         self.jobs: dict[str, dict] = {}    # job_id -> {filename, polls, status}
         self.next_id = 0
@@ -70,12 +79,18 @@ class FakeServer:
 
         # Signed-URL downloads come through the same transport
         if req.url.host.startswith("dl.fake"):
+            if self._download_neterr_remaining > 0:
+                self._download_neterr_remaining -= 1
+                raise httpx.ReadTimeout("simulated network drop", request=req)
             return httpx.Response(200, content=b"merged-bytes")
 
         if req.method == "POST" and path == "/v1/jobs":
             self.post_count += 1
             if self._auth_fails:
                 return httpx.Response(401, json={"detail": "bad key"})
+            if self._submit_neterr_remaining > 0:
+                self._submit_neterr_remaining -= 1
+                raise httpx.ConnectError("simulated network drop", request=req)
             if self._submit_429_remaining > 0:
                 self._submit_429_remaining -= 1
                 return httpx.Response(429, json={"detail": "slow down"})
@@ -103,6 +118,9 @@ class FakeServer:
             return httpx.Response(200, json={"files_deleted": 1, "already_purged": False})
 
         if req.method == "GET" and path.startswith("/v1/jobs/"):
+            if self._poll_neterr_remaining > 0:
+                self._poll_neterr_remaining -= 1
+                raise httpx.ReadTimeout("simulated network drop", request=req)
             jid = path.split("/")[-1]
             j = self.jobs[jid]
             j["polls"] += 1
@@ -150,6 +168,8 @@ def fast_polls(monkeypatch):
     monkeypatch.setattr(_batch, "_POLL_MAX_INTERVAL", 0.01)
     monkeypatch.setattr(_batch, "_SUBMIT_RETRY_BASE", 0.001)
     monkeypatch.setattr(_batch, "_SUBMIT_RETRY_MAX", 0.01)
+    monkeypatch.setattr(_batch, "_DOWNLOAD_RETRY_BASE", 0.001)
+    monkeypatch.setattr(_batch, "_DOWNLOAD_RETRY_MAX", 0.01)
 
 
 def _client(server: FakeServer) -> APIClientAsync:
@@ -217,6 +237,58 @@ async def test_rate_limit_retries_and_succeeds(files, tmp_path, fast_polls):
     assert result.successes == ["a.pdf"]
     # 1 success + 2 429s = 3 POSTs total
     assert server.post_count == 3
+
+
+# --- transient network errors (httpx.TransportError) ---
+
+async def test_submit_retries_on_transport_error(files, tmp_path, fast_polls):
+    # First 2 POSTs drop at the transport level, then success
+    server = FakeServer(complete_after_polls=1, submit_neterr_count=2)
+    out = tmp_path / "out"
+
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], out)
+
+    assert result.successes == ["a.pdf"]
+    assert server.post_count == 3
+
+
+async def test_submit_exhausted_transport_retries_marks_failed_not_crash(
+    files, tmp_path, fast_polls,
+):
+    # Every POST drops — file must end up in failures, batch must not raise
+    server = FakeServer(submit_neterr_count=99)
+    out = tmp_path / "out"
+
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], out)
+
+    assert result.successes == []
+    assert "a.pdf" in result.failures
+
+
+async def test_poll_survives_transport_errors(files, tmp_path, fast_polls):
+    # First 3 status GETs drop mid-poll; polling must ride through
+    server = FakeServer(complete_after_polls=2, poll_neterr_count=3)
+    out = tmp_path / "out"
+
+    async with _client(server) as client:
+        result = await run_batch(client, files, out)
+
+    assert sorted(result.successes) == ["a.pdf", "b.pdf", "c.pdf"]
+    assert result.failures == {}
+
+
+async def test_download_retries_on_transport_error(files, tmp_path, fast_polls):
+    # First 2 signed-URL GETs drop, third attempt succeeds
+    server = FakeServer(complete_after_polls=1, download_neterr_count=2)
+    out = tmp_path / "out"
+
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], out)
+
+    assert result.successes == ["a.pdf"]
+    assert result.manifest.jobs["a.pdf"].downloaded
 
 
 # --- fatal auth failure ---
