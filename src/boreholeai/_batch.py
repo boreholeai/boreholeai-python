@@ -28,6 +28,8 @@ from boreholeai._api import APIClientAsync
 from boreholeai._manifest import (
     STATUS_COMPLETED,
     STATUS_FAILED,
+    STATUS_PROCESSING,
+    STATUS_QUEUED,
     STATUS_SUBMITTED,
     STATUS_SUBMIT_FAILED,
     Manifest,
@@ -63,6 +65,24 @@ _SUBMIT_RETRY_MAX = 60.0
 _DOWNLOAD_MAX_RETRIES = 3
 _DOWNLOAD_RETRY_BASE = 2.0
 _DOWNLOAD_RETRY_MAX = 30.0
+
+# Poll error taxonomy. Permanent HTTP verdicts fail the file immediately —
+# retrying cannot change the server's answer (revoked key, no credits,
+# job unknown). Everything else retries with backoff but gives up after
+# this many CONSECUTIVE errors (~5 min at the max interval); a successful
+# poll resets the streak, so a long server-side queue still waits
+# indefinitely.
+_POLL_PERMANENT_HTTP = (401, 402, 404)
+_POLL_MAX_ERROR_STREAK = 30
+
+# Statuses the server can legitimately report on a poll. Anything else is
+# treated as a server fault (counts toward the error streak) and is never
+# written into the manifest, so a resumed run can't be stranded on a
+# status the state machine doesn't know.
+_KNOWN_POLL_STATUSES = (
+    STATUS_SUBMITTED, STATUS_QUEUED, STATUS_PROCESSING,
+    STATUS_COMPLETED, STATUS_FAILED,
+)
 
 _WORKDIR_NAME = ".boreholeai_workdir"
 
@@ -131,7 +151,7 @@ async def run_batch(
     # cap_sem through download). Result: file 1's download runs in parallel
     # with file 2's submit+poll, instead of serializing.
     await asyncio.gather(*(
-        _process_one(
+        _process_one_safe(
             name, files_by_name[name], client,
             cap_sem, download_sem,
             manifest, save_lock, output_dir, workdir, on_progress,
@@ -140,6 +160,35 @@ async def run_batch(
     ))
 
     return _build_result(manifest, files_by_name, workdir)
+
+
+async def _process_one_safe(
+    name: str, file_path: Path, client: APIClientAsync,
+    cap_sem: asyncio.Semaphore, download_sem: asyncio.Semaphore,
+    manifest: Manifest, save_lock: asyncio.Lock,
+    output_dir: Path, workdir: Path,
+    on_progress: Optional[Callable[[Manifest], None]] = None,
+) -> None:
+    """Last-resort firewall around one file's lifecycle.
+
+    Every anticipated error class is handled inside `_process_one`; this
+    net exists so that an unanticipated one (server contract drift, local
+    I/O surprise) fails this one file instead of cancelling the whole
+    gather and killing the other N-1 files mid-run.
+    """
+    try:
+        await _process_one(
+            name, file_path, client, cap_sem, download_sem,
+            manifest, save_lock, output_dir, workdir, on_progress,
+        )
+    except Exception as exc:
+        logger.error("unexpected error on %s: %r", name, exc)
+        async with save_lock:
+            e = manifest.jobs[name]
+            e.status = STATUS_FAILED
+            e.error = f"unexpected error: {exc!r}"
+            _manifest.save(manifest, output_dir)
+        _emit_progress(on_progress, manifest)
 
 
 async def _process_one(
@@ -199,9 +248,14 @@ async def _submit_one(
     for attempt in range(1, _SUBMIT_MAX_RETRIES + 1):
         try:
             data = await client.create_job([file_path])
+            job_id = data.get("job_id") if isinstance(data, dict) else None
+            if not job_id:
+                # Server accepted the POST but broke its contract — treat
+                # like a 5xx so the existing transient retry applies.
+                raise ServerError("Server accepted the upload but returned no job id")
             async with save_lock:
                 e = manifest.jobs[name]
-                e.job_id = data["job_id"]
+                e.job_id = job_id
                 e.num_pages = data.get("num_pages")
                 e.status = STATUS_SUBMITTED
                 e.submitted_at = _manifest._now()
@@ -216,7 +270,7 @@ async def _submit_one(
                 e.reprocess = False
                 _manifest.save(manifest, output_dir)
             _emit_progress(on_progress, manifest)
-            logger.info("submitted %s → job %s", name, data["job_id"][:8])
+            logger.info("submitted %s → job %s", name, job_id[:8])
             return
         except (RateLimitError, ServerError, httpx.TransportError) as exc:
             if attempt >= _SUBMIT_MAX_RETRIES:
@@ -266,51 +320,97 @@ async def _poll_one(
     save_lock: asyncio.Lock, output_dir: Path,
     on_progress: Optional[Callable[[Manifest], None]] = None,
 ) -> None:
-    """Poll one job until it reaches a terminal state. Tolerates transient
-    polling errors with backoff — only terminal job statuses end the loop."""
+    """Poll one job until it reaches a terminal state.
+
+    Transient errors (timeouts, 429/5xx, unparseable bodies, unknown
+    statuses) retry with backoff, bounded to `_POLL_MAX_ERROR_STREAK`
+    consecutive failures. Permanent HTTP verdicts (401/402/404) fail the
+    file immediately so the concurrency slot is released — retrying a
+    revoked key or a deleted job forever would hang the batch silently.
+    """
     job_id = manifest.jobs[name].job_id
     if job_id is None:
         return
 
     interval = _POLL_INITIAL_INTERVAL
+    error_streak = 0
     while True:
         try:
             data = await client.get_job(job_id)
         except (BoreholeAIError, httpx.TransportError) as exc:
-            logger.warning("poll error on %s (%s) — retry in %.1fs", name, exc, interval)
+            if getattr(exc, "status_code", None) in _POLL_PERMANENT_HTTP:
+                await _mark_poll_failed(
+                    name, f"poll rejected (HTTP {exc.status_code}): {exc}",
+                    manifest, save_lock, output_dir, on_progress,
+                )
+                return
+            error_streak += 1
+            if error_streak >= _POLL_MAX_ERROR_STREAK:
+                await _mark_poll_failed(
+                    name, f"poll gave up after {error_streak} consecutive errors: {exc}",
+                    manifest, save_lock, output_dir, on_progress,
+                )
+                return
+            logger.warning(
+                "poll error on %s (%s) — retry %d/%d in %.1fs",
+                name, exc, error_streak, _POLL_MAX_ERROR_STREAK, interval,
+            )
             await asyncio.sleep(interval)
             interval = min(interval * _POLL_BACKOFF_FACTOR, _POLL_MAX_INTERVAL)
             continue
 
-        status = data.get("status", "")
+        status = data.get("status") if isinstance(data, dict) else None
+        if status not in _KNOWN_POLL_STATUSES:
+            # Contract drift or a mangled body — don't write it into the
+            # manifest (a resumed run couldn't act on it); treat like any
+            # other transient server fault.
+            error_streak += 1
+            if error_streak >= _POLL_MAX_ERROR_STREAK:
+                await _mark_poll_failed(
+                    name, f"server kept returning unrecognised status {status!r}",
+                    manifest, save_lock, output_dir, on_progress,
+                )
+                return
+            logger.warning(
+                "unrecognised status %r on %s — retry %d/%d in %.1fs",
+                status, name, error_streak, _POLL_MAX_ERROR_STREAK, interval,
+            )
+            await asyncio.sleep(interval)
+            interval = min(interval * _POLL_BACKOFF_FACTOR, _POLL_MAX_INTERVAL)
+            continue
+
+        error_streak = 0
         progress = data.get("progress") or {}
+        if not isinstance(progress, dict):
+            progress = {}
         async with save_lock:
             e = manifest.jobs[name]
             e.status = status
             # Live page + subgraph state for the renderer (drives the
-            # progress bar via _progress.compute_progress).
-            page = progress.get("page")
-            pages_total = progress.get("pages_total")
+            # progress bar via _progress.compute_progress). Progress is
+            # cosmetic — junk values are ignored, never fatal.
+            page = _as_int(progress.get("page"))
+            pages_total = _as_int(progress.get("pages_total"))
             completed = progress.get("completed_subgraphs")
             if page is not None:
-                e.current_page = int(page)
+                e.current_page = page
             if pages_total:
-                e.pages_total = int(pages_total)
+                e.pages_total = pages_total
                 if e.num_pages is None:
-                    e.num_pages = int(pages_total)
-            if completed is not None:
-                e.completed_subgraphs = list(completed)
+                    e.num_pages = pages_total
+            if isinstance(completed, list):
+                e.completed_subgraphs = [str(s) for s in completed]
             # Legacy pages_done — kept up to date for older renderers.
-            pages_done = progress.get("pages_done")
+            pages_done = _as_int(progress.get("pages_done"))
             if pages_done is not None:
-                e.pages_done = int(pages_done)
+                e.pages_done = pages_done
             if status == STATUS_FAILED:
                 e.error = data.get("error_message", "unknown error")
                 e.completed_at = _manifest._now()
             elif status == STATUS_COMPLETED:
                 e.completed_at = _manifest._now()
                 if e.num_pages is None:
-                    e.num_pages = data.get("num_pages")
+                    e.num_pages = _as_int(data.get("num_pages"))
                 if e.num_pages:
                     e.pages_done = e.num_pages
             _manifest.save(manifest, output_dir)
@@ -321,6 +421,32 @@ async def _poll_one(
 
         await asyncio.sleep(interval)
         interval = min(interval * _POLL_BACKOFF_FACTOR, _POLL_MAX_INTERVAL)
+
+
+async def _mark_poll_failed(
+    name: str, error: str, manifest: Manifest,
+    save_lock: asyncio.Lock, output_dir: Path,
+    on_progress: Optional[Callable[[Manifest], None]] = None,
+) -> None:
+    """Record a poll-level permanent failure. Status FAILED means the
+    re-run loop treats the file as re-submittable once the underlying
+    cause (key, credits, deleted job) is fixed."""
+    async with save_lock:
+        e = manifest.jobs[name]
+        e.status = STATUS_FAILED
+        e.error = error
+        e.completed_at = _manifest._now()
+        _manifest.save(manifest, output_dir)
+    _emit_progress(on_progress, manifest)
+    logger.error("poll failed for %s: %s", name, error)
+
+
+def _as_int(value: Any) -> Optional[int]:
+    """Best-effort int conversion; None for junk instead of ValueError."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 async def _download_one(
@@ -354,12 +480,34 @@ async def _download_one(
         logger.error("results fetch failed for %s: %s", name, exc)
         return
 
-    files_to_dl = results.get("files", [])
+    files_to_dl = results.get("files") if isinstance(results, dict) else None
+    if not isinstance(files_to_dl, list) or not files_to_dl:
+        # A completed job always has result files. A missing/malformed/empty
+        # list means the server broke its contract — fail the file (leaving
+        # downloaded=False so a re-run re-attempts) rather than "succeeding"
+        # with an empty job dir that silently drops this borehole from the
+        # merge.
+        async with save_lock:
+            manifest.jobs[name].error = (
+                f"results fetch failed: invalid or empty file list ({files_to_dl!r})"
+            )
+            _manifest.save(manifest, output_dir)
+        _emit_progress(on_progress, manifest)
+        logger.error("invalid results file list for %s: %r", name, files_to_dl)
+        return
     for f in files_to_dl:
         try:
+            entry = f if isinstance(f, dict) else {}
+            # Flatten to a basename: a server-side bug must not be able to
+            # write outside the job workdir via ../ or an absolute path.
+            filename = Path(str(entry.get("filename") or "")).name
+            url = entry.get("url")
+            if not filename or not url:
+                raise ValueError(f"malformed file entry in results: {f!r}")
             content = await _retry_transport(
-                lambda: client.download_file(f["url"]), "download", name,
+                lambda: client.download_file(url), "download", name,
             )
+            (job_workdir / filename).write_bytes(content)
         except Exception as exc:
             async with save_lock:
                 manifest.jobs[name].error = f"download failed: {exc}"
@@ -367,7 +515,6 @@ async def _download_one(
             _emit_progress(on_progress, manifest)
             logger.error("download failed for %s: %s", name, exc)
             return
-        (job_workdir / f["filename"]).write_bytes(content)
 
     async with save_lock:
         manifest.jobs[name].downloaded = True
