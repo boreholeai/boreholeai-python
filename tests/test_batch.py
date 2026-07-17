@@ -58,6 +58,8 @@ class FakeServer:
         progress_junk: bool = False,
         results_file_entry: Optional[dict] = None,
         results_files_raw: object = None,
+        stuck_processing: bool = False,
+        progress_ticks: bool = False,
     ):
         self._complete_after = complete_after_polls
         self._fail_jobs = set(fail_jobs)
@@ -75,6 +77,8 @@ class FakeServer:
         self._progress_junk = progress_junk
         self._results_file_entry = results_file_entry
         self._results_files_raw = results_files_raw
+        self._stuck_processing = stuck_processing
+        self._progress_ticks = progress_ticks
         # state
         self.jobs: dict[str, dict] = {}    # job_id -> {filename, polls, status}
         self.next_id = 0
@@ -163,6 +167,12 @@ class FakeServer:
             if self._poll_unknown_status_remaining > 0:
                 self._poll_unknown_status_remaining -= 1
                 return httpx.Response(200, json={"status": "reticulating"})
+            if self._stuck_processing:
+                # Dead-worker simulation: forever "processing", frozen progress
+                return httpx.Response(200, json={
+                    "status": "processing",
+                    "progress": {"pages_done": 1, "pages_total": 3},
+                })
             jid = path.split("/")[-1]
             j = self.jobs[jid]
             j["polls"] += 1
@@ -176,6 +186,8 @@ class FakeServer:
                 j["status"] = "completed"
             progress = {"pages_done": 3 if j["status"] == "completed" else 1,
                         "pages_total": 3}
+            if self._progress_ticks:
+                progress["pages_done"] = j["polls"]  # changes every poll
             if self._progress_junk:
                 progress = {"page": "N/A", "pages_total": "many",
                             "pages_done": None, "completed_subgraphs": "nope"}
@@ -433,6 +445,35 @@ async def test_poll_unknown_status_retries_then_completes(files, tmp_path, fast_
 async def test_progress_junk_is_ignored(files, tmp_path, fast_polls):
     """Progress fields are cosmetic — junk values must never fail a file."""
     server = FakeServer(complete_after_polls=2, progress_junk=True)
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], tmp_path / "out")
+
+    assert result.successes == ["a.pdf"]
+
+
+async def test_stuck_job_fails_after_stagnation_budget(
+    files, tmp_path, fast_polls, monkeypatch,
+):
+    """A job whose worker died answers 'processing' with frozen progress
+    forever — the guard fails it client-side instead of polling for days."""
+    monkeypatch.setattr(_batch, "_STUCK_PROCESSING_BUDGET", 0.03)
+    monkeypatch.setattr(_batch, "_STUCK_QUEUED_BUDGET", 0.03)
+    server = FakeServer(stuck_processing=True)
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], tmp_path / "out")
+
+    assert result.successes == []
+    assert "appears stuck" in result.failures["a.pdf"]
+
+
+async def test_slow_but_progressing_job_not_marked_stuck(
+    files, tmp_path, fast_polls, monkeypatch,
+):
+    """A long job whose progress keeps ticking resets the stagnation clock
+    on every observable change — it must never be declared stuck."""
+    monkeypatch.setattr(_batch, "_STUCK_PROCESSING_BUDGET", 0.05)
+    monkeypatch.setattr(_batch, "_STUCK_QUEUED_BUDGET", 0.05)
+    server = FakeServer(complete_after_polls=30, progress_ticks=True)
     async with _client(server) as client:
         result = await run_batch(client, [files[0]], tmp_path / "out")
 
