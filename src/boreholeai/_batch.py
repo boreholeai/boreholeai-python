@@ -44,7 +44,10 @@ from boreholeai.exceptions import (
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_CONCURRENCY = 10
+# Client-side ceiling only — the effective in-flight count is
+# min(this, the API key's server-side max_concurrent_jobs from /v1/me),
+# so the admin-page cap governs whenever it is <= this value.
+_DEFAULT_CONCURRENCY = 20
 
 _POLL_INITIAL_INTERVAL = 2.0
 _POLL_MAX_INTERVAL = 10.0
