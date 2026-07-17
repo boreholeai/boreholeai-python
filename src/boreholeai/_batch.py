@@ -206,6 +206,14 @@ async def _submit_one(
                 e.status = STATUS_SUBMITTED
                 e.submitted_at = _manifest._now()
                 e.error = None
+                # A (re)submitted entry is a new server job — any download
+                # state from a previous job_id no longer applies, and a
+                # user-set reprocess flag is now consumed. Without the
+                # downloaded reset, a manually re-queued entry would never
+                # have its new results downloaded.
+                e.downloaded = False
+                e.purged = False
+                e.reprocess = False
                 _manifest.save(manifest, output_dir)
             _emit_progress(on_progress, manifest)
             logger.info("submitted %s → job %s", name, data["job_id"][:8])

@@ -9,7 +9,7 @@ N directories and writes:
         Borehole_ground_profile_merged.xlsx     (when N > 1)
         Borehole_test_data_merged.xlsx          (when N > 1)
         Borehole_ags4_merged.ags                (when N > 1)
-        <file>_annotated.pdf                    (one per source file)
+        annotated_pdf/<file>_annotated.pdf      (one per source file)
         merge_warnings.txt                      (only if warnings emitted)
 
 For N == 1, files are copied with their original names (no `_merged`
@@ -75,7 +75,12 @@ def merge_results(
 
     if len(input_dirs) == 1:
         for src in _glob_results(input_dirs[0]):
-            dest = output_dir / src.name
+            if src.name.endswith("_annotated.pdf"):
+                dest_dir = output_dir / "annotated_pdf"
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                dest = dest_dir / src.name
+            else:
+                dest = output_dir / src.name
             shutil.copy2(src, dest)
             result.files.append(dest)
         return result
@@ -151,10 +156,13 @@ def merge_results(
             len(json_paths), out,
         )
 
-    for pdf in annotated_pdfs:
-        dest = output_dir / pdf.name
-        shutil.copy2(pdf, dest)
-        result.files.append(dest)
+    if annotated_pdfs:
+        annotated_dir = output_dir / "annotated_pdf"
+        annotated_dir.mkdir(parents=True, exist_ok=True)
+        for pdf in annotated_pdfs:
+            dest = annotated_dir / pdf.name
+            shutil.copy2(pdf, dest)
+            result.files.append(dest)
 
     for w in result.warnings:
         logger.warning(w)

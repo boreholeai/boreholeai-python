@@ -367,6 +367,39 @@ async def test_resume_retries_server_side_failed_job(files, tmp_path, fast_polls
     assert result.manifest.jobs["a.pdf"].error is None
 
 
+async def test_reprocess_flag_forces_rerun_and_redownload(
+    files, tmp_path, fast_polls,
+):
+    """Setting `reprocess: true` on a completed entry (the documented manual
+    redo switch) re-runs just that file. Stale downloaded/purged flags from
+    the old job must not survive the resubmit, or the new results would never
+    be pulled; the reprocess flag itself is consumed by the resubmit."""
+    out = tmp_path / "out"
+    out.mkdir()
+
+    pre = _manifest.load_or_init(
+        out, input_root=tmp_path, concurrency=6, files=[files[0]],
+    )
+    pre.jobs["a.pdf"].job_id = "old-completed-job"
+    pre.jobs["a.pdf"].status = _manifest.STATUS_COMPLETED
+    pre.jobs["a.pdf"].downloaded = True
+    pre.jobs["a.pdf"].purged = True
+    pre.jobs["a.pdf"].reprocess = True   # the manual edit
+    _manifest.save(pre, out)
+
+    server = FakeServer(complete_after_polls=1)
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], out)
+
+    assert server.post_count == 1
+    assert result.successes == ["a.pdf"]
+    entry = result.manifest.jobs["a.pdf"]
+    assert entry.job_id != "old-completed-job"
+    assert entry.downloaded  # new job's results actually downloaded
+    assert entry.reprocess is False  # flag consumed — won't loop forever
+    assert (Path(result.workdir) / entry.job_id).exists()
+
+
 async def test_resume_continues_polling_existing_job(files, tmp_path, fast_polls):
     """Manifest with status=submitted + job_id should resume polling, not POST again."""
     out = tmp_path / "out"
