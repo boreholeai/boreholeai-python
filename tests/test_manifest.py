@@ -83,8 +83,8 @@ def test_load_adds_entries_for_new_files(tmp_path):
     m.jobs["a.pdf"].status = STATUS_COMPLETED
     save(m, out)
 
-    # Add a new file, re-load
-    new_files = _files(tmp_path, ["a.pdf", "b.pdf"])
+    # Add a new file (without touching a.pdf), re-load
+    new_files = files + _files(tmp_path, ["b.pdf"])
     m2 = load_or_init(out, input_root=tmp_path, concurrency=6, files=new_files)
 
     assert m2.jobs["a.pdf"].status == STATUS_COMPLETED  # preserved
@@ -100,18 +100,81 @@ def test_load_rejects_unknown_version(tmp_path):
         load_or_init(out, input_root=tmp_path, concurrency=6, files=[])
 
 
-def test_load_warns_on_input_root_mismatch(tmp_path, caplog):
+def test_load_raises_on_input_root_mismatch(tmp_path):
     files = _files(tmp_path, ["a.pdf"])
     out = tmp_path / "out"
     load_or_init(out, input_root=tmp_path, concurrency=6, files=files)
 
-    # Re-load with a different input_root
+    # Re-load with a different input_root — a kept manifest must never
+    # silently skip same-named files from an unrelated folder.
     other_root = tmp_path / "other"
     other_root.mkdir()
-    with caplog.at_level("WARNING"):
+    with pytest.raises(ValueError, match="different input folder"):
         load_or_init(out, input_root=other_root, concurrency=6, files=[])
 
-    assert any("input_root differs" in r.message for r in caplog.records)
+
+# --- source-file fingerprint (incremental reruns) ---
+
+def test_load_resets_entry_when_source_file_changed(tmp_path):
+    files = _files(tmp_path, ["a.pdf"])
+    out = tmp_path / "out"
+    m = load_or_init(out, input_root=tmp_path, concurrency=6, files=files)
+    m.jobs["a.pdf"].status = STATUS_COMPLETED
+    m.jobs["a.pdf"].job_id = "old-job"
+    m.jobs["a.pdf"].downloaded = True
+    save(m, out)
+
+    files[0].write_bytes(b"replacement scan")  # same name, new content
+
+    m2 = load_or_init(out, input_root=tmp_path, concurrency=6, files=files)
+    assert m2.jobs["a.pdf"].status == STATUS_PENDING
+    assert m2.jobs["a.pdf"].job_id is None
+    assert m2.jobs["a.pdf"].downloaded is False
+
+
+def test_load_keeps_entry_when_source_unchanged(tmp_path):
+    files = _files(tmp_path, ["a.pdf"])
+    out = tmp_path / "out"
+    m = load_or_init(out, input_root=tmp_path, concurrency=6, files=files)
+    m.jobs["a.pdf"].status = STATUS_COMPLETED
+    m.jobs["a.pdf"].job_id = "job-1"
+    m.jobs["a.pdf"].downloaded = True
+    save(m, out)
+
+    m2 = load_or_init(out, input_root=tmp_path, concurrency=6, files=files)
+    assert m2.jobs["a.pdf"].status == STATUS_COMPLETED
+    assert m2.jobs["a.pdf"].job_id == "job-1"
+
+
+def test_needs_submit_when_reprocess_flag_set(tmp_path):
+    files = _files(tmp_path, ["a.pdf"])
+    out = tmp_path / "out"
+    m = load_or_init(out, input_root=tmp_path, concurrency=6, files=files)
+    e = m.jobs["a.pdf"]
+    e.status = STATUS_COMPLETED
+    e.job_id = "job-1"
+    e.downloaded = True
+
+    assert not m.needs_submit("a.pdf")
+    e.reprocess = True
+    assert m.needs_submit("a.pdf")
+
+
+def test_load_never_resets_legacy_entries_without_fingerprint(tmp_path):
+    files = _files(tmp_path, ["a.pdf"])
+    out = tmp_path / "out"
+    m = load_or_init(out, input_root=tmp_path, concurrency=6, files=files)
+    entry = m.jobs["a.pdf"]
+    entry.status = STATUS_COMPLETED
+    entry.downloaded = True
+    entry.src_size = None       # simulate a manifest written pre-fingerprint
+    entry.src_mtime = None
+    save(m, out)
+
+    files[0].write_bytes(b"changed after the fact")
+
+    m2 = load_or_init(out, input_root=tmp_path, concurrency=6, files=files)
+    assert m2.jobs["a.pdf"].status == STATUS_COMPLETED  # not reset
 
 
 # --- atomic write ---

@@ -11,7 +11,7 @@ from openpyxl import Workbook
 from boreholeai._merge import merge_results
 
 
-def _make_job_dir(d: Path, *, gp=True, td=True, ags=True, pdf=True) -> Path:
+def _make_job_dir(d: Path, *, gp=True, td=True, ags=True, pdf=True, js=True) -> Path:
     d.mkdir(parents=True, exist_ok=True)
     if gp:
         wb = Workbook(); ws = wb.active
@@ -27,6 +27,10 @@ def _make_job_dir(d: Path, *, gp=True, td=True, ags=True, pdf=True) -> Path:
         )
     if pdf:
         (d / "BH1_annotated.pdf").write_bytes(b"%PDF-1.4\n%fake\n")
+    if js:
+        (d / "Borehole_data.json").write_text(
+            '{"BH1": {"material_layers": [{"material": "CLAY"}]}}'
+        )
     return d
 
 
@@ -46,6 +50,9 @@ def test_single_job_copies_originals(tmp_path):
     assert "Borehole_test_data.xlsx" in names
     assert "Borehole_ags4.ags" in names
     assert "BH1_annotated.pdf" in names
+    # Annotated PDFs land in their own subfolder, not the output root
+    assert (out / "annotated_pdf" / "BH1_annotated.pdf").exists()
+    assert not (out / "BH1_annotated.pdf").exists()
     # No _merged suffix on single-job
     assert not any("_merged" in n for n in names)
     assert result.warnings == []

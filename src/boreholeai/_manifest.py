@@ -38,15 +38,26 @@ STATUS_FAILED = "failed"
 
 @dataclass
 class JobEntry:
-    """Per-input-file state. Filename is the dict key in `Manifest.jobs`."""
+    """Per-input-file state. Filename is the dict key in `Manifest.jobs`.
 
+    Field order is deliberate: the human-relevant fields serialize first so
+    someone inspecting the manifest by hand sees status/error/reprocess at
+    the top of each entry, ahead of the machine bookkeeping.
+    """
+
+    # Human-relevant state.
+    status: str = STATUS_PENDING
+    error: Optional[str] = None
+    # User-facing redo switch: set to true (in the manifest JSON, by hand)
+    # to force this file to be re-processed on the next run, without touching
+    # `status`. Cleared automatically when the file is resubmitted.
+    reprocess: bool = False
+    downloaded: bool = False
+    # Machine bookkeeping.
     job_id: Optional[str] = None
     num_pages: Optional[int] = None
     pages_done: int = 0                 # legacy; kept for back-compat manifests
-    status: str = STATUS_PENDING
-    downloaded: bool = False
     purged: bool = False                # only meaningful if API key has purge_on_download
-    error: Optional[str] = None
     submitted_at: Optional[str] = None
     completed_at: Optional[str] = None
     # Live-progress fields, populated from poll responses' `progress` JSONB.
@@ -54,6 +65,12 @@ class JobEntry:
     current_page: int = 1
     pages_total: int = 1
     completed_subgraphs: list[str] = field(default_factory=list)
+    # Source-file fingerprint, captured when the entry is created. On resume,
+    # an entry whose file changed on disk is reset and re-processed instead of
+    # being silently skipped by name. None on manifests written before this
+    # field existed — those entries are never reset (legacy behaviour).
+    src_size: Optional[int] = None
+    src_mtime: Optional[float] = None
 
 
 @dataclass
@@ -75,11 +92,12 @@ class Manifest:
         """True if this file should be POSTed (or re-POSTed).
 
         Re-POSTs on resume for: never-submitted entries (PENDING),
-        entries whose POST itself errored (SUBMIT_FAILED), and entries
-        whose server-side processing failed (FAILED). The last case
-        treats server-side failures as transient by default — the
-        common cause is an LLM/network blip the user can ride through
-        by re-running the batch.
+        entries whose POST itself errored (SUBMIT_FAILED), entries
+        whose server-side processing failed (FAILED), and entries the
+        user flagged with `reprocess: true` in the manifest JSON. The
+        FAILED case treats server-side failures as transient by
+        default — the common cause is an LLM/network blip the user can
+        ride through by re-running the batch.
         """
         e = self.jobs.get(filename)
         if e is None:
@@ -87,6 +105,7 @@ class Manifest:
         return (
             e.status in (STATUS_PENDING, STATUS_SUBMIT_FAILED, STATUS_FAILED)
             or e.job_id is None
+            or e.reprocess
         )
 
     def needs_poll(self, filename: str) -> bool:
@@ -115,9 +134,12 @@ def load_or_init(
 
     For an existing manifest:
       - Validates version. Mismatch raises.
-      - Warns if `input_root` differs from saved (likely stale manifest).
+      - Raises if `input_root` differs from saved — a kept manifest must not
+        silently skip same-named files from a different input folder.
       - Adds entries for any new files not yet tracked (state=pending).
-      - Existing entries are preserved as-is so resume picks up where it left off.
+      - Resets entries whose source file changed on disk (size/mtime) so an
+        updated PDF with the same name is re-processed, not skipped.
+      - Other existing entries are preserved so resume picks up where it left off.
 
     For a fresh manifest:
       - One pending entry per file in `files`.
@@ -130,15 +152,22 @@ def load_or_init(
     if path.exists():
         manifest = _read(path)
         if manifest.input_root and manifest.input_root != str(input_root):
-            logger.warning(
-                "manifest input_root differs (saved=%s, current=%s) — "
-                "treating saved entries as authoritative",
-                manifest.input_root, input_root,
+            raise ValueError(
+                f"The manifest in {output_dir} was created for a different "
+                f"input folder (saved: {manifest.input_root}, current: "
+                f"{input_root}). Use a different output_dir, or delete "
+                f"{MANIFEST_FILENAME} and .boreholeai_workdir/ from "
+                f"{output_dir} to start fresh."
             )
-        # Add pending entries for newly-seen files.
         for f in files:
-            if f.name not in manifest.jobs:
-                manifest.jobs[f.name] = JobEntry()
+            existing = manifest.jobs.get(f.name)
+            if existing is None:
+                manifest.jobs[f.name] = _entry_for(f)
+            elif _source_changed(existing, f):
+                logger.info(
+                    "%s changed on disk since last run — will re-process", f.name,
+                )
+                manifest.jobs[f.name] = _entry_for(f)
         manifest.updated_at = _now()
         save(manifest, output_dir)
         return manifest
@@ -152,7 +181,7 @@ def load_or_init(
         concurrency=concurrency,
         input_root=str(input_root),
         output_dir=str(output_dir),
-        jobs={f.name: JobEntry() for f in files},
+        jobs={f.name: _entry_for(f) for f in files},
     )
     save(manifest, output_dir)
     return manifest
@@ -176,6 +205,30 @@ def save(manifest: Manifest, output_dir: Path) -> None:
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _entry_for(f: Path) -> JobEntry:
+    """Fresh pending entry fingerprinted with the file's current size/mtime."""
+    try:
+        st = f.stat()
+        return JobEntry(src_size=st.st_size, src_mtime=st.st_mtime)
+    except OSError:
+        return JobEntry()
+
+
+def _source_changed(entry: JobEntry, f: Path) -> bool:
+    """True if the file on disk no longer matches the entry's fingerprint.
+
+    Entries without a fingerprint (written by older SDK versions) are
+    never considered changed.
+    """
+    if entry.src_size is None or entry.src_mtime is None:
+        return False
+    try:
+        st = f.stat()
+    except OSError:
+        return False
+    return st.st_size != entry.src_size or st.st_mtime != entry.src_mtime
 
 
 def _atomic_write_json(path: Path, data: dict) -> None:
@@ -214,6 +267,11 @@ def _read(path: Path) -> Manifest:
 
 def _to_dict(m: Manifest) -> dict:
     return {
+        "_note": (
+            "Managed by the boreholeai SDK. Safe manual edit: set "
+            'jobs.<filename>.reprocess to true to force that file to re-run '
+            "on the next invocation. Leave the other fields alone."
+        ),
         "version": m.version,
         "created_at": m.created_at,
         "updated_at": m.updated_at,
