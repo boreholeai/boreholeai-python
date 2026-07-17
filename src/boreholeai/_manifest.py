@@ -48,6 +48,10 @@ class JobEntry:
     # Human-relevant state.
     status: str = STATUS_PENDING
     error: Optional[str] = None
+    # Informational only: set when a COMPLETED job's own Processing Info
+    # sheet reports page-level extraction failures (job succeeded, but not
+    # every page digitised). Never affects resume decisions.
+    warning: Optional[str] = None
     # User-facing redo switch: set to true (in the manifest JSON, by hand)
     # to force this file to be re-processed on the next run, without touching
     # `status`. Cleared automatically when the file is resubmitted.

@@ -60,6 +60,7 @@ class FakeServer:
         results_files_raw: object = None,
         stuck_processing: bool = False,
         progress_ticks: bool = False,
+        download_bytes: Optional[bytes] = None,
     ):
         self._complete_after = complete_after_polls
         self._fail_jobs = set(fail_jobs)
@@ -79,6 +80,7 @@ class FakeServer:
         self._results_files_raw = results_files_raw
         self._stuck_processing = stuck_processing
         self._progress_ticks = progress_ticks
+        self._download_bytes = download_bytes
         # state
         self.jobs: dict[str, dict] = {}    # job_id -> {filename, polls, status}
         self.next_id = 0
@@ -109,6 +111,8 @@ class FakeServer:
             if self._download_neterr_remaining > 0:
                 self._download_neterr_remaining -= 1
                 raise httpx.ReadTimeout("simulated network drop", request=req)
+            if self._download_bytes is not None:
+                return httpx.Response(200, content=self._download_bytes)
             return httpx.Response(200, content=b"merged-bytes")
 
         if req.method == "POST" and path == "/v1/jobs":
@@ -540,6 +544,70 @@ async def test_download_traversal_filename_stays_in_workdir(files, tmp_path, fas
     job_id = result.manifest.jobs["a.pdf"].job_id
     assert (out / ".boreholeai_workdir" / job_id / "evil.ags").exists()
     assert not (out / "evil.ags").exists()  # escape attempt contained
+
+
+def _gp_xlsx_with_processing_info(failed: int, total: int = 2, names=()) -> bytes:
+    """Build a minimal Borehole_ground_profile.xlsx with a Processing Info
+    sheet, mirroring the backend's stats layout."""
+    import io
+
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Ground Profile"
+    ws.append(["Hole_ID", "material"])
+    pi = wb.create_sheet("Processing Info")
+    pi.append(["Metric", "Value"])
+    pi.append(["Total Boreholes", str(total)])
+    pi.append(["Boreholes Digitalised", str(total - failed)])
+    pi.append(["Boreholes Failed", str(failed)])
+    if names:
+        pi.append(["— Failed Boreholes —", ""])
+        for n in names:
+            pi.append([f"  {n}", "page failed"])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+async def test_page_failure_warning_recorded_on_completed_job(
+    files, tmp_path, fast_polls,
+):
+    """A completed job whose Processing Info sheet reports failed pages gets
+    an informational warning — still a success, never a failure."""
+    payload = _gp_xlsx_with_processing_info(failed=1, names=["BH1_page_001"])
+    server = FakeServer(
+        complete_after_polls=1,
+        results_file_entry={
+            "filename": "Borehole_ground_profile.xlsx", "url": "https://dl.fake/x",
+        },
+        download_bytes=payload,
+    )
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], tmp_path / "out")
+
+    assert result.successes == ["a.pdf"]
+    entry = result.manifest.jobs["a.pdf"]
+    assert entry.warning is not None
+    assert "1 of 2" in entry.warning
+    assert "BH1_page_001" in entry.warning
+
+
+async def test_no_warning_when_all_pages_digitised(files, tmp_path, fast_polls):
+    payload = _gp_xlsx_with_processing_info(failed=0)
+    server = FakeServer(
+        complete_after_polls=1,
+        results_file_entry={
+            "filename": "Borehole_ground_profile.xlsx", "url": "https://dl.fake/x",
+        },
+        download_bytes=payload,
+    )
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], tmp_path / "out")
+
+    assert result.successes == ["a.pdf"]
+    assert result.manifest.jobs["a.pdf"].warning is None
 
 
 # --- last-resort firewall ---

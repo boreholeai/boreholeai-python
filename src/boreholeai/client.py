@@ -222,6 +222,20 @@ class BoreholeAI:
             _log("Failures:")
             for name, err in batch.failures.items():
                 _log(f"  {name}: {err}")
+
+        # Successful jobs can still contain pages that failed extraction —
+        # the job-level status can't see those, but each job's Processing
+        # Info sheet records them and the download step lifts them into
+        # the manifest.
+        page_warnings = {
+            name: entry.warning
+            for name, entry in (batch.manifest.jobs.items() if batch.manifest else [])
+            if entry.warning and name in batch.successes
+        }
+        if page_warnings:
+            _log(f"🟡 {len(page_warnings)} completed file(s) have failed pages:")
+            for name, w in page_warnings.items():
+                _log(f"  {name}: {w}")
         if merged_files:
             _log(f"🟢 Saved {len(merged_files)} file(s) to {output_dir}")
             for f in merged_files:
@@ -273,6 +287,7 @@ class BoreholeAI:
             job_ids=list(batch.job_ids.values()),
             successes=list(batch.successes),
             failures=dict(batch.failures),
+            warnings=page_warnings,
         )
 
 
@@ -462,6 +477,10 @@ class _PerFileProgress:
             return _bar_processing(entry, elapsed_in_sg)
         if s == STATUS_COMPLETED:
             if entry.downloaded:
+                if entry.warning:
+                    # e.g. "✓ done (1 of 2 borehole page(s) failed extraction)"
+                    short = entry.warning.split(" — ")[0].split(":")[0]
+                    return f"✓ done ({short})"
                 return "✓ done"
             return _bar_full() + "  downloading…"
         if s == STATUS_FAILED:

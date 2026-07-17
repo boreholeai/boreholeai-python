@@ -32,3 +32,6 @@ class JobResult:
     job_ids: list[str] = field(default_factory=list)
     successes: list[str] = field(default_factory=list)            # input filenames
     failures: dict[str, str] = field(default_factory=dict)        # filename → error
+    # New in 0.6.7 — successful files whose own Processing Info sheet
+    # reports page-level extraction failures (informational).
+    warnings: dict[str, str] = field(default_factory=dict)        # filename → warning
