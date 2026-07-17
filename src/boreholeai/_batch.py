@@ -206,6 +206,14 @@ async def _submit_one(
                 e.status = STATUS_SUBMITTED
                 e.submitted_at = _manifest._now()
                 e.error = None
+                # A (re)submitted entry is a new server job — any download
+                # state from a previous job_id no longer applies, and a
+                # user-set reprocess flag is now consumed. Without the
+                # downloaded reset, a manually re-queued entry would never
+                # have its new results downloaded.
+                e.downloaded = False
+                e.purged = False
+                e.reprocess = False
                 _manifest.save(manifest, output_dir)
             _emit_progress(on_progress, manifest)
             logger.info("submitted %s → job %s", name, data["job_id"][:8])
@@ -220,6 +228,16 @@ async def _submit_one(
             )
             await asyncio.sleep(delay)
             delay = min(delay * 2, _SUBMIT_RETRY_MAX)
+        except OSError as exc:
+            # Local read failure — the file was deleted/renamed/made
+            # unreadable after collection (e.g. mid-run folder edit). Not
+            # transient: retrying re-reads the same missing file. Fail this
+            # file only; if it reappears, a later re-run picks it up.
+            await _mark_submit_failed(
+                name, f"source file missing or unreadable: {exc}",
+                manifest, save_lock, output_dir, on_progress,
+            )
+            return
         except (AuthenticationError, InsufficientCreditsError) as exc:
             # Fatal — no point retrying this file or any other (caller will see)
             await _mark_submit_failed(name, str(exc), manifest, save_lock, output_dir, on_progress)

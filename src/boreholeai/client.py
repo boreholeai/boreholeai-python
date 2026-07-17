@@ -109,6 +109,7 @@ class BoreholeAI:
         input_path: str | Path,
         *,
         output_dir: str | Path = _DEFAULT_OUTPUT_DIR,
+        finalise_and_cleanup: Optional[bool] = None,
     ) -> JobResult:
         """Submit, process, and merge a single file or a folder of files.
 
@@ -118,6 +119,17 @@ class BoreholeAI:
             output_dir: Where merged results land. Created if missing.
                 If `.boreholeai_manifest.json` is present from a prior run,
                 that work is resumed; already-completed files are skipped.
+            finalise_and_cleanup: What to do with the resume state (manifest
+                + per-job workdir) after a fully-successful run.
+                True — delete it, leaving only the merged outputs.
+                False — keep it, so files added to `input_path` later are
+                processed incrementally on re-run (completed files are
+                skipped, the merge re-covers everything).
+                None (default) — keep it, and when running at an interactive
+                terminal ask "clean up? [y/N]" once everything has completed.
+                Any non-answer (Enter, EOF, Ctrl-C, closed window) keeps the
+                state; a later re-run asks again. Cleanup never happens on a
+                partial/failed run regardless of this setting.
 
         Returns:
             JobResult — `status` is "completed", "partial", or "failed";
@@ -141,7 +153,7 @@ class BoreholeAI:
                 renderer.finalise()
 
         elapsed = time.monotonic() - start
-        return self._finalise(batch, files, out, elapsed)
+        return self._finalise(batch, files, out, elapsed, finalise_and_cleanup)
 
     async def _run(
         self, files: list[Path], output_dir: Path, concurrency: int,
@@ -165,6 +177,7 @@ class BoreholeAI:
     def _finalise(
         self, batch: BatchResult, files: list[Path],
         output_dir: Path, elapsed: float,
+        finalise_and_cleanup: Optional[bool] = None,
     ) -> JobResult:
         """Merge successful jobs, log summary, build JobResult."""
         success_dirs = [
@@ -219,13 +232,27 @@ class BoreholeAI:
 
         # Clean up the per-job workdir AND the manifest only when everything
         # succeeded. On partial/failed runs we keep both so the user can
-        # inspect or resume the run.
+        # inspect or resume the run. With finalise_and_cleanup=False they are
+        # kept even on success, so a later run over a grown input folder
+        # processes only the new files and re-merges the full set. With the
+        # default None, an interactive user is asked; keeping is the safe
+        # default everywhere else. The merged outputs are already written by
+        # this point, so no answer (or a killed process) loses nothing.
         if status == "completed":
-            if batch.workdir is not None and batch.workdir.exists():
-                shutil.rmtree(batch.workdir, ignore_errors=True)
-            manifest_path = output_dir / ".boreholeai_manifest.json"
-            if manifest_path.exists():
-                manifest_path.unlink()
+            cleanup = finalise_and_cleanup
+            if cleanup is None:
+                cleanup = _prompt_cleanup(n_total)
+            if cleanup:
+                if batch.workdir is not None and batch.workdir.exists():
+                    shutil.rmtree(batch.workdir, ignore_errors=True)
+                manifest_path = output_dir / ".boreholeai_manifest.json"
+                if manifest_path.exists():
+                    manifest_path.unlink()
+            else:
+                _log(
+                    "🟡 Kept resume state — re-run to add files incrementally, "
+                    "or pass finalise_and_cleanup=True to clean up"
+                )
 
         primary_job_id = next(iter(batch.job_ids.values()), "")
         total_pages = sum(
@@ -254,6 +281,29 @@ class BoreholeAI:
 def _log(message: str) -> None:
     """Print a status line to stderr."""
     print(f"  {message}", file=sys.stderr, flush=True)
+
+
+def _prompt_cleanup(n_files: int) -> bool:
+    """Ask an interactive user whether to delete the resume state.
+
+    Only asks when both stdin and stderr are terminals — under cron/CI/
+    pipes this returns False without blocking. Any non-answer (empty,
+    EOF, Ctrl-C, unrecognised input) also means keep: keeping state is
+    always recoverable by a later run, deleting is not.
+    """
+    if not (sys.stdin.isatty() and sys.stderr.isatty()):
+        return False
+    print(
+        f"  All {n_files} file(s) completed — clean up the manifest and "
+        f"working file cache? [y/N] ",
+        end="", file=sys.stderr, flush=True,
+    )
+    try:
+        answer = input()
+    except (EOFError, KeyboardInterrupt):
+        print(file=sys.stderr)
+        return False
+    return answer.strip().lower() in ("y", "yes")
 
 
 def _fmt_time(seconds: float) -> str:
