@@ -19,7 +19,9 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable, Coroutine, Optional
+
+import httpx
 
 from boreholeai import _manifest
 from boreholeai._api import APIClientAsync
@@ -54,6 +56,13 @@ _POLL_BACKOFF_FACTOR = 1.5
 _SUBMIT_MAX_RETRIES = 5
 _SUBMIT_RETRY_BASE = 2.0
 _SUBMIT_RETRY_MAX = 60.0
+
+# Download retries — bounded, for transient network errors while fetching
+# results. Exhausted retries mark the file failed for this run; a re-run
+# re-attempts the download without resubmitting the job.
+_DOWNLOAD_MAX_RETRIES = 3
+_DOWNLOAD_RETRY_BASE = 2.0
+_DOWNLOAD_RETRY_MAX = 30.0
 
 _WORKDIR_NAME = ".boreholeai_workdir"
 
@@ -201,7 +210,7 @@ async def _submit_one(
             _emit_progress(on_progress, manifest)
             logger.info("submitted %s → job %s", name, data["job_id"][:8])
             return
-        except (RateLimitError, ServerError) as exc:
+        except (RateLimitError, ServerError, httpx.TransportError) as exc:
             if attempt >= _SUBMIT_MAX_RETRIES:
                 await _mark_submit_failed(name, str(exc), manifest, save_lock, output_dir, on_progress)
                 return
@@ -249,7 +258,7 @@ async def _poll_one(
     while True:
         try:
             data = await client.get_job(job_id)
-        except BoreholeAIError as exc:
+        except (BoreholeAIError, httpx.TransportError) as exc:
             logger.warning("poll error on %s (%s) — retry in %.1fs", name, exc, interval)
             await asyncio.sleep(interval)
             interval = min(interval * _POLL_BACKOFF_FACTOR, _POLL_MAX_INTERVAL)
@@ -316,8 +325,10 @@ async def _download_one(
     job_workdir.mkdir(parents=True, exist_ok=True)
 
     try:
-        results = await client.get_results(job_id)
-    except BoreholeAIError as exc:
+        results = await _retry_transport(
+            lambda: client.get_results(job_id), "results fetch", name,
+        )
+    except (BoreholeAIError, httpx.TransportError) as exc:
         async with save_lock:
             manifest.jobs[name].error = f"results fetch failed: {exc}"
             _manifest.save(manifest, output_dir)
@@ -328,7 +339,9 @@ async def _download_one(
     files_to_dl = results.get("files", [])
     for f in files_to_dl:
         try:
-            content = await client.download_file(f["url"])
+            content = await _retry_transport(
+                lambda: client.download_file(f["url"]), "download", name,
+            )
         except Exception as exc:
             async with save_lock:
                 manifest.jobs[name].error = f"download failed: {exc}"
@@ -357,6 +370,29 @@ async def _download_one(
             )
         except BoreholeAIError as exc:
             logger.warning("purge failed for %s: %s", name, exc)
+
+
+async def _retry_transport(
+    fn: Callable[[], Coroutine[Any, Any, Any]], what: str, name: str,
+) -> Any:
+    """Await `fn()`, retrying transient network errors with backoff.
+
+    Only retries httpx.TransportError (timeouts, dropped connections);
+    HTTP-level and SDK errors propagate to the caller unchanged.
+    """
+    delay = _DOWNLOAD_RETRY_BASE
+    for attempt in range(1, _DOWNLOAD_MAX_RETRIES + 1):
+        try:
+            return await fn()
+        except httpx.TransportError as exc:
+            if attempt >= _DOWNLOAD_MAX_RETRIES:
+                raise
+            logger.warning(
+                "transient %s error on %s (%s) — retry %d/%d in %.1fs",
+                what, name, exc, attempt, _DOWNLOAD_MAX_RETRIES, delay,
+            )
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, _DOWNLOAD_RETRY_MAX)
 
 
 def _emit_progress(
