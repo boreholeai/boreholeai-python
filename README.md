@@ -72,6 +72,8 @@ for f in result.files:
     print(f"  {f.filename}")
 ```
 
+Results land in `output_dir`, with the annotated PDF under `annotated_pdf/`. When everything has completed, a run at an interactive terminal asks whether to clean up its resume state — answer `y` for a one-shot run, or see [Incremental Runs](#incremental-runs) for why you might keep it.
+
 ## Folder / Batch Processing
 
 Pass a directory path to process multiple files together. The SDK processes files in parallel and merges the outputs locally into a single ground profile Excel, test data Excel, AGS file, and data JSON. Annotated PDFs are collected in an `annotated_pdf/` subfolder, one per input file.
