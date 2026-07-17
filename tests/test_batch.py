@@ -29,6 +29,15 @@ class FakeServer:
       submit_neterr_count: first N POSTs raise a transport error.
       poll_neterr_count: first N status GETs raise a transport error.
       download_neterr_count: first N signed-URL GETs raise a transport error.
+      poll_http_status: if set, every status GET returns this HTTP code.
+      poll_bad_body_count: first N status GETs return 200 with an HTML body.
+      poll_unknown_status_count: first N status GETs return 200 with an
+        unrecognised status value.
+      submit_no_jobid_count: first N POSTs return 202 without a job_id.
+      progress_junk: status GETs report non-numeric progress fields.
+      results_file_entry: if set, get_results returns exactly this one entry.
+      results_files_raw: if not None, used verbatim as the results "files"
+        value (for malformed / empty list tests).
     """
 
     def __init__(
@@ -42,6 +51,13 @@ class FakeServer:
         submit_neterr_count: int = 0,
         poll_neterr_count: int = 0,
         download_neterr_count: int = 0,
+        poll_http_status: Optional[int] = None,
+        poll_bad_body_count: int = 0,
+        poll_unknown_status_count: int = 0,
+        submit_no_jobid_count: int = 0,
+        progress_junk: bool = False,
+        results_file_entry: Optional[dict] = None,
+        results_files_raw: object = None,
     ):
         self._complete_after = complete_after_polls
         self._fail_jobs = set(fail_jobs)
@@ -52,6 +68,13 @@ class FakeServer:
         self._submit_neterr_remaining = submit_neterr_count
         self._poll_neterr_remaining = poll_neterr_count
         self._download_neterr_remaining = download_neterr_count
+        self._poll_http_status = poll_http_status
+        self._poll_bad_body_remaining = poll_bad_body_count
+        self._poll_unknown_status_remaining = poll_unknown_status_count
+        self._submit_no_jobid_remaining = submit_no_jobid_count
+        self._progress_junk = progress_junk
+        self._results_file_entry = results_file_entry
+        self._results_files_raw = results_files_raw
         # state
         self.jobs: dict[str, dict] = {}    # job_id -> {filename, polls, status}
         self.next_id = 0
@@ -94,6 +117,9 @@ class FakeServer:
             if self._submit_429_remaining > 0:
                 self._submit_429_remaining -= 1
                 return httpx.Response(429, json={"detail": "slow down"})
+            if self._submit_no_jobid_remaining > 0:
+                self._submit_no_jobid_remaining -= 1
+                return httpx.Response(202, json={"credits_remaining": 100})
 
             # Read filename from multipart body for state tracking
             filename = self._extract_filename(req)
@@ -106,8 +132,14 @@ class FakeServer:
 
         if req.method == "GET" and path.startswith("/v1/jobs/") and path.endswith("/results"):
             jid = path.split("/")[-2]
+            file_entry = self._results_file_entry
+            if file_entry is None:
+                file_entry = {"filename": "Borehole_ags4.ags", "url": f"https://dl.fake/{jid}"}
+            files_value = [file_entry]
+            if self._results_files_raw is not None:
+                files_value = self._results_files_raw
             return httpx.Response(200, json={
-                "files": [{"filename": "Borehole_ags4.ags", "url": f"https://dl.fake/{jid}"}],
+                "files": files_value,
                 "purge_on_download": (
                     self.jobs[jid]["filename"] in self._purge_jobs
                 ),
@@ -121,6 +153,16 @@ class FakeServer:
             if self._poll_neterr_remaining > 0:
                 self._poll_neterr_remaining -= 1
                 raise httpx.ReadTimeout("simulated network drop", request=req)
+            if self._poll_http_status is not None:
+                return httpx.Response(
+                    self._poll_http_status, json={"detail": "poll rejected"},
+                )
+            if self._poll_bad_body_remaining > 0:
+                self._poll_bad_body_remaining -= 1
+                return httpx.Response(200, content=b"<html>502 Bad Gateway</html>")
+            if self._poll_unknown_status_remaining > 0:
+                self._poll_unknown_status_remaining -= 1
+                return httpx.Response(200, json={"status": "reticulating"})
             jid = path.split("/")[-1]
             j = self.jobs[jid]
             j["polls"] += 1
@@ -132,11 +174,15 @@ class FakeServer:
                 })
             if j["polls"] >= self._complete_after:
                 j["status"] = "completed"
+            progress = {"pages_done": 3 if j["status"] == "completed" else 1,
+                        "pages_total": 3}
+            if self._progress_junk:
+                progress = {"page": "N/A", "pages_total": "many",
+                            "pages_done": None, "completed_subgraphs": "nope"}
             return httpx.Response(200, json={
                 "status": j["status"],
                 "num_pages": 3,
-                "progress": {"pages_done": 3 if j["status"] == "completed" else 1,
-                             "pages_total": 3},
+                "progress": progress,
             })
 
         return httpx.Response(404)
@@ -304,6 +350,146 @@ async def test_download_retries_on_transport_error(files, tmp_path, fast_polls):
 
     assert result.successes == ["a.pdf"]
     assert result.manifest.jobs["a.pdf"].downloaded
+
+
+# --- poll error taxonomy (permanent verdicts, error streak, contract drift) ---
+
+async def test_poll_permanent_http_fails_file_fast_no_hang(files, tmp_path, fast_polls):
+    """401/402/404 on poll are final answers — fail the file and release the
+    slot instead of retrying forever (the silent-hang failure mode)."""
+    for code in (401, 402, 404):
+        server = FakeServer(poll_http_status=code)
+        out = tmp_path / f"out{code}"
+        async with _client(server) as client:
+            result = await run_batch(client, [files[0]], out)
+
+        assert result.successes == []
+        assert f"poll rejected (HTTP {code})" in result.failures["a.pdf"]
+
+
+async def test_poll_error_streak_gives_up(files, tmp_path, fast_polls, monkeypatch):
+    """Unbroken transient poll errors eventually fail the file instead of
+    spinning forever while holding the concurrency slot."""
+    monkeypatch.setattr(_batch, "_POLL_MAX_ERROR_STREAK", 3)
+    server = FakeServer(poll_neterr_count=99)
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], tmp_path / "out")
+
+    assert "gave up after 3 consecutive errors" in result.failures["a.pdf"]
+
+
+async def test_poll_html_body_retries_then_completes(files, tmp_path, fast_polls):
+    """A proxy answering 200 with an HTML page is transient — ride it out."""
+    server = FakeServer(complete_after_polls=1, poll_bad_body_count=2)
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], tmp_path / "out")
+
+    assert result.successes == ["a.pdf"]
+
+
+async def test_poll_unknown_status_retries_then_completes(files, tmp_path, fast_polls):
+    """An unrecognised status value is contract drift: never written to the
+    manifest, retried like a server fault, recovered when sanity returns."""
+    server = FakeServer(complete_after_polls=1, poll_unknown_status_count=2)
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], tmp_path / "out")
+
+    assert result.successes == ["a.pdf"]
+    assert result.manifest.jobs["a.pdf"].status == "completed"
+
+
+async def test_progress_junk_is_ignored(files, tmp_path, fast_polls):
+    """Progress fields are cosmetic — junk values must never fail a file."""
+    server = FakeServer(complete_after_polls=2, progress_junk=True)
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], tmp_path / "out")
+
+    assert result.successes == ["a.pdf"]
+
+
+# --- malformed server responses (submit / results contract) ---
+
+async def test_submit_missing_job_id_retries_then_succeeds(files, tmp_path, fast_polls):
+    """A 202 without job_id is treated like a 5xx: retried, not fatal."""
+    server = FakeServer(complete_after_polls=1, submit_no_jobid_count=2)
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], tmp_path / "out")
+
+    assert result.successes == ["a.pdf"]
+    assert server.post_count == 3
+
+
+async def test_download_missing_filename_fails_file_not_batch(files, tmp_path, fast_polls):
+    server = FakeServer(
+        complete_after_polls=1,
+        results_file_entry={"url": "https://dl.fake/x"},  # no filename
+    )
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], tmp_path / "out")
+
+    assert "a.pdf" in result.failures  # failed cleanly, batch survived
+
+
+async def test_results_files_not_a_list_fails_file(files, tmp_path, fast_polls):
+    """A malformed `files` value must fail the file, not count as a
+    zero-artifact success that silently drops the borehole from the merge."""
+    server = FakeServer(complete_after_polls=1, results_files_raw={"oops": 1})
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], tmp_path / "out")
+
+    assert result.successes == []
+    assert "a.pdf" in result.failures
+    assert result.manifest.jobs["a.pdf"].downloaded is False
+
+
+async def test_results_empty_file_list_fails_file(files, tmp_path, fast_polls):
+    """A completed job with zero result files is a broken contract."""
+    server = FakeServer(complete_after_polls=1, results_files_raw=[])
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], tmp_path / "out")
+
+    assert result.successes == []
+    assert "a.pdf" in result.failures
+    assert result.manifest.jobs["a.pdf"].downloaded is False
+
+
+async def test_download_traversal_filename_stays_in_workdir(files, tmp_path, fast_polls):
+    """A ../-laden filename from the server is flattened to its basename."""
+    server = FakeServer(
+        complete_after_polls=1,
+        results_file_entry={"filename": "../../evil.ags", "url": "https://dl.fake/x"},
+    )
+    out = tmp_path / "out"
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], out)
+
+    assert result.successes == ["a.pdf"]
+    job_id = result.manifest.jobs["a.pdf"].job_id
+    assert (out / ".boreholeai_workdir" / job_id / "evil.ags").exists()
+    assert not (out / "evil.ags").exists()  # escape attempt contained
+
+
+# --- last-resort firewall ---
+
+async def test_unexpected_error_fails_one_file_not_batch(
+    files, tmp_path, fast_polls, monkeypatch,
+):
+    """Anything unanticipated fails one file; the other files still finish."""
+    real_submit = _batch._submit_one
+
+    async def poisoned(name, *args, **kwargs):
+        if name == "b.pdf":
+            raise RuntimeError("boom")
+        return await real_submit(name, *args, **kwargs)
+
+    monkeypatch.setattr(_batch, "_submit_one", poisoned)
+    server = FakeServer(complete_after_polls=1)
+    async with _client(server) as client:
+        result = await run_batch(client, files, tmp_path / "out")
+
+    assert sorted(result.successes) == ["a.pdf", "c.pdf"]
+    assert "unexpected error" in result.failures["b.pdf"]
+    assert "boom" in result.failures["b.pdf"]
 
 
 # --- fatal auth failure ---

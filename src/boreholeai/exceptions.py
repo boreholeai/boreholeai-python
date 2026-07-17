@@ -1,5 +1,7 @@
 """BoreholeAI SDK exceptions."""
 
+from __future__ import annotations
+
 
 class BoreholeAIError(Exception):
     """Base exception for all SDK errors."""

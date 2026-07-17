@@ -110,19 +110,19 @@ class APIClientAsync:
         ]
         resp = await client.post("/v1/jobs", files=files)
         _raise_for_status(resp)
-        return resp.json()
+        return _json_body(resp)
 
     async def get_job(self, job_id: str) -> dict[str, Any]:
         client = await self._connect()
         resp = await client.get(f"/v1/jobs/{job_id}")
         _raise_for_status(resp)
-        return resp.json()
+        return _json_body(resp)
 
     async def get_results(self, job_id: str) -> dict[str, Any]:
         client = await self._connect()
         resp = await client.get(f"/v1/jobs/{job_id}/results")
         _raise_for_status(resp)
-        return resp.json()
+        return _json_body(resp)
 
     async def get_me(self) -> dict[str, Any]:
         """GET /v1/me — per-user account info, including the server's
@@ -133,7 +133,7 @@ class APIClientAsync:
         client = await self._connect()
         resp = await client.get("/v1/me")
         _raise_for_status(resp)
-        return resp.json()
+        return _json_body(resp)
 
     async def download_file(self, url: str) -> bytes:
         """Download a signed URL.
@@ -154,7 +154,7 @@ class APIClientAsync:
         client = await self._connect()
         resp = await client.delete(f"/v1/jobs/{job_id}")
         _raise_for_status(resp)
-        return resp.json()
+        return _json_body(resp)
 
 
 
@@ -223,6 +223,22 @@ def _is_strictly_newer(candidate: str, current: str) -> bool:
         )
     except (ValueError, AttributeError):
         return False
+
+
+def _json_body(resp: httpx.Response) -> Any:
+    """Parse a successful response body, guarding against non-JSON.
+
+    Proxies and tunnels (nginx, Cloudflare) can answer with an HTML page
+    even on 2xx. Classify that as ServerError: it is transient, and every
+    call site already retries ServerError with backoff.
+    """
+    try:
+        return resp.json()
+    except ValueError:
+        raise ServerError(
+            "Server returned an invalid (non-JSON) response body",
+            resp.status_code,
+        )
 
 
 def _raise_for_status(resp: httpx.Response) -> None:
