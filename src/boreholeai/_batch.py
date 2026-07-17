@@ -73,6 +73,16 @@ _RATE_LIMIT_RETRY_BASE = 5.0    # matches the server's Retry-After hint
 _RATE_LIMIT_RETRY_MAX = 60.0
 _RATE_LIMIT_STALL_BUDGET = 30 * 60.0
 
+# Stuck-job guard. A live job's poll responses change constantly (status
+# transitions, page/subgraph progress stamps); a job whose worker died
+# mid-flight answers "processing" with frozen progress forever. If nothing
+# observable changes for the budget, fail the file client-side and release
+# its slot — the server-side row still needs an admin requeue or the
+# backend's stale-job self-heal. Queued jobs get a longer leash: waiting
+# behind a deep queue is legitimate stillness.
+_STUCK_PROCESSING_BUDGET = 30 * 60.0
+_STUCK_QUEUED_BUDGET = 120 * 60.0
+
 # Download retries — bounded, for transient network errors while fetching
 # results. Exhausted retries mark the file failed for this run; a re-run
 # re-attempts the download without resubmitting the job.
@@ -398,6 +408,8 @@ async def _poll_one(
 
     interval = _POLL_INITIAL_INTERVAL
     error_streak = 0
+    last_observed: Optional[tuple] = None
+    last_change = time.monotonic()
     while True:
         try:
             data = await client.get_job(job_id)
@@ -477,6 +489,10 @@ async def _poll_one(
                     e.num_pages = _as_int(data.get("num_pages"))
                 if e.num_pages:
                     e.pages_done = e.num_pages
+            observed = (
+                status, e.current_page, e.pages_total,
+                tuple(e.completed_subgraphs), e.pages_done,
+            )
             _manifest.save(manifest, output_dir)
         _emit_progress(on_progress, manifest)
 
@@ -484,6 +500,29 @@ async def _poll_one(
             if pulse is not None:
                 pulse.beat()  # terminal state frees a server-side slot
             return
+
+        # Stuck-job guard: the poll loop is the timer — remember what we
+        # last saw and when it last changed. A dead worker's job answers
+        # "processing" with frozen progress forever; a live one changes
+        # within minutes.
+        if observed != last_observed:
+            last_observed = observed
+            last_change = time.monotonic()
+        else:
+            budget = (
+                _STUCK_PROCESSING_BUDGET if status == STATUS_PROCESSING
+                else _STUCK_QUEUED_BUDGET
+            )
+            if time.monotonic() - last_change > budget:
+                await _mark_poll_failed(
+                    name,
+                    f"job appears stuck — no progress for "
+                    f"{int(budget // 60)} minutes in status {status!r}. The "
+                    "worker may have died mid-job; requeue it from the admin "
+                    "jobs list or restart the worker server.",
+                    manifest, save_lock, output_dir, on_progress,
+                )
+                return
 
         await asyncio.sleep(interval)
         interval = min(interval * _POLL_BACKOFF_FACTOR, _POLL_MAX_INTERVAL)
