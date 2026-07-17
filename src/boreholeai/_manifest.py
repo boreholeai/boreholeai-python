@@ -38,15 +38,26 @@ STATUS_FAILED = "failed"
 
 @dataclass
 class JobEntry:
-    """Per-input-file state. Filename is the dict key in `Manifest.jobs`."""
+    """Per-input-file state. Filename is the dict key in `Manifest.jobs`.
 
+    Field order is deliberate: the human-relevant fields serialize first so
+    someone inspecting the manifest by hand sees status/error/reprocess at
+    the top of each entry, ahead of the machine bookkeeping.
+    """
+
+    # Human-relevant state.
+    status: str = STATUS_PENDING
+    error: Optional[str] = None
+    # User-facing redo switch: set to true (in the manifest JSON, by hand)
+    # to force this file to be re-processed on the next run, without touching
+    # `status`. Cleared automatically when the file is resubmitted.
+    reprocess: bool = False
+    downloaded: bool = False
+    # Machine bookkeeping.
     job_id: Optional[str] = None
     num_pages: Optional[int] = None
     pages_done: int = 0                 # legacy; kept for back-compat manifests
-    status: str = STATUS_PENDING
-    downloaded: bool = False
     purged: bool = False                # only meaningful if API key has purge_on_download
-    error: Optional[str] = None
     submitted_at: Optional[str] = None
     completed_at: Optional[str] = None
     # Live-progress fields, populated from poll responses' `progress` JSONB.
@@ -60,10 +71,6 @@ class JobEntry:
     # field existed — those entries are never reset (legacy behaviour).
     src_size: Optional[int] = None
     src_mtime: Optional[float] = None
-    # User-facing redo switch: set to true (in the manifest JSON, by hand)
-    # to force this file to be re-processed on the next run, without touching
-    # `status`. Cleared automatically when the file is resubmitted.
-    reprocess: bool = False
 
 
 @dataclass
@@ -260,6 +267,11 @@ def _read(path: Path) -> Manifest:
 
 def _to_dict(m: Manifest) -> dict:
     return {
+        "_note": (
+            "Managed by the boreholeai SDK. Safe manual edit: set "
+            'jobs.<filename>.reprocess to true to force that file to re-run '
+            "on the next invocation. Leave the other fields alone."
+        ),
         "version": m.version,
         "created_at": m.created_at,
         "updated_at": m.updated_at,

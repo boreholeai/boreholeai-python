@@ -267,6 +267,21 @@ async def test_submit_exhausted_transport_retries_marks_failed_not_crash(
     assert "a.pdf" in result.failures
 
 
+async def test_missing_source_file_fails_that_file_only(files, tmp_path, fast_polls):
+    """A file deleted after collection (mid-run folder edit) must not kill
+    the batch: it's marked submit_failed and the other files proceed."""
+    out = tmp_path / "out"
+    files[1].unlink()  # b.pdf vanishes before its submit slot
+
+    server = FakeServer(complete_after_polls=1)
+    async with _client(server) as client:
+        result = await run_batch(client, files, out)
+
+    assert sorted(result.successes) == ["a.pdf", "c.pdf"]
+    assert "b.pdf" in result.failures
+    assert "missing or unreadable" in result.failures["b.pdf"]
+
+
 async def test_poll_survives_transport_errors(files, tmp_path, fast_polls):
     # First 3 status GETs drop mid-poll; polling must ride through
     server = FakeServer(complete_after_polls=2, poll_neterr_count=3)
