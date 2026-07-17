@@ -318,6 +318,7 @@ async def _submit_one(
                 e.downloaded = False
                 e.purged = False
                 e.reprocess = False
+                e.warning = None
                 _manifest.save(manifest, output_dir)
             _emit_progress(on_progress, manifest)
             logger.info("submitted %s → job %s", name, job_id[:8])
@@ -621,11 +622,20 @@ async def _download_one(
             logger.error("download failed for %s: %s", name, exc)
             return
 
+    # Job-level success can hide page-level extraction failures (a page
+    # that fails validation is skipped; the job still completes). The
+    # job's own Processing Info sheet records them — surface that.
+    warning = _page_failure_warning(job_workdir)
+
     async with save_lock:
-        manifest.jobs[name].downloaded = True
+        e = manifest.jobs[name]
+        e.downloaded = True
+        e.warning = warning
         _manifest.save(manifest, output_dir)
     _emit_progress(on_progress, manifest)
     logger.info("downloaded %d file(s) for %s", len(files_to_dl), name)
+    if warning:
+        logger.warning("%s: %s", name, warning)
 
     if results.get("purge_on_download"):
         try:
@@ -640,6 +650,43 @@ async def _download_one(
             )
         except BoreholeAIError as exc:
             logger.warning("purge failed for %s: %s", name, exc)
+
+
+def _page_failure_warning(job_workdir: Path) -> Optional[str]:
+    """Describe page-level extraction failures from the job's own
+    Processing Info sheet, or None if every page digitised.
+
+    Never raises: a completed, downloaded job must not fail because this
+    diagnostic couldn't be read (missing sheet, odd values, corrupt file
+    are all treated as "nothing to report").
+    """
+    try:
+        from openpyxl import load_workbook
+
+        from boreholeai._merge._processing_info import read_processing_info
+
+        gp = next(iter(sorted(job_workdir.glob("Borehole_ground_profile*.xlsx"))), None)
+        if gp is None:
+            return None
+        wb = load_workbook(gp, read_only=True, data_only=True)
+        try:
+            if "Processing Info" not in wb.sheetnames:
+                return None
+            info = read_processing_info(wb["Processing Info"])
+        finally:
+            wb.close()
+        failed = int(str(info.get("Boreholes Failed", "0")).strip())
+        if failed <= 0:
+            return None
+        total = str(info.get("Total Boreholes", "?")).strip() or "?"
+        names = [k.strip() for k in info if k.startswith("  ")]
+        listing = f": {', '.join(names)}" if names else ""
+        return (
+            f"{failed} of {total} borehole page(s) failed extraction"
+            f"{listing} — see the Processing Info sheet in the Excel"
+        )
+    except Exception:
+        return None
 
 
 async def _retry_transport(
