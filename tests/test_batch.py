@@ -216,6 +216,8 @@ def fast_polls(monkeypatch):
     monkeypatch.setattr(_batch, "_SUBMIT_RETRY_MAX", 0.01)
     monkeypatch.setattr(_batch, "_DOWNLOAD_RETRY_BASE", 0.001)
     monkeypatch.setattr(_batch, "_DOWNLOAD_RETRY_MAX", 0.01)
+    monkeypatch.setattr(_batch, "_RATE_LIMIT_RETRY_BASE", 0.001)
+    monkeypatch.setattr(_batch, "_RATE_LIMIT_RETRY_MAX", 0.01)
 
 
 def _client(server: FakeServer) -> APIClientAsync:
@@ -283,6 +285,36 @@ async def test_rate_limit_retries_and_succeeds(files, tmp_path, fast_polls):
     assert result.successes == ["a.pdf"]
     # 1 success + 2 429s = 3 POSTs total
     assert server.post_count == 3
+
+
+async def test_rate_limit_waits_beyond_any_attempt_budget(files, tmp_path, fast_polls):
+    """429 is backpressure — a file waits out a long cap-full stretch (here
+    8 rejections, beyond the old 5-attempt budget) and still succeeds."""
+    server = FakeServer(complete_after_polls=1, submit_429_count=8)
+    out = tmp_path / "out"
+
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], out)
+
+    assert result.successes == ["a.pdf"]
+    assert server.post_count == 9
+
+
+async def test_rate_limit_gives_up_only_when_batch_stalled(
+    files, tmp_path, fast_polls, monkeypatch,
+):
+    """If submits are refused AND nothing in the batch progresses for the
+    stall budget, the cap is stuck (zombie jobs) — fail with a pointed
+    message instead of waiting forever."""
+    monkeypatch.setattr(_batch, "_RATE_LIMIT_STALL_BUDGET", 0.05)
+    server = FakeServer(submit_429_count=10**6)
+    out = tmp_path / "out"
+
+    async with _client(server) as client:
+        result = await run_batch(client, [files[0]], out)
+
+    assert result.successes == []
+    assert "concurrency cap appears stuck" in result.failures["a.pdf"]
 
 
 # --- transient network errors (httpx.TransportError) ---
