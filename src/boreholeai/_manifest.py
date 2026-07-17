@@ -267,11 +267,24 @@ def _read(path: Path) -> Manifest:
 
 def _to_dict(m: Manifest) -> dict:
     return {
-        "_note": (
-            "Managed by the boreholeai SDK. Safe manual edit: set "
-            'jobs.<filename>.reprocess to true to force that file to re-run '
-            "on the next invocation. Leave the other fields alone."
-        ),
+        "_note": [
+            "Managed by the boreholeai SDK. Reading anything is safe; make only "
+            "the edits below, then re-run the same process_documents() call.",
+            "REDO ONE FILE: set jobs.<filename>.reprocess to true. It is "
+            "re-processed (and re-charged) on the next run; the flag clears "
+            "itself. Do not edit 'status' - it mirrors the server's record.",
+            "FIXED A BAD SCAN: just save the corrected file over the old one in "
+            "the input folder. The size/date fingerprint detects the change and "
+            "re-processes it automatically - no manifest edit needed.",
+            "FAILED FILES: no edit needed. Every file whose status is 'failed' "
+            "or 'submit_failed' is retried automatically on the next run. To "
+            "give up on a bad file, delete it from the input folder instead.",
+            "START ONE FILE COMPLETELY FRESH: delete its whole entry from "
+            "'jobs'. The next run treats it as never seen.",
+            "Do not edit any other field, and do not delete this file while "
+            "work is unfinished - a deleted manifest means every file is "
+            "re-processed and re-charged from scratch.",
+        ],
         "version": m.version,
         "created_at": m.created_at,
         "updated_at": m.updated_at,
