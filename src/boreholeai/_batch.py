@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Coroutine, Optional
@@ -54,13 +56,22 @@ _POLL_MAX_INTERVAL = 10.0
 _POLL_BACKOFF_FACTOR = 1.5
 
 # Submit retries — safety net for genuine transient errors (5xx, brief
-# network blips). With cap-aware client-side pacing (see run_batch's
-# call to client.get_me()) the SDK normally never sends a POST that
-# would be 429'd by the cap. So 5 retries with exponential backoff is
-# enough; we don't need to wait out long server queues here.
+# network blips). 5 attempts with exponential backoff.
 _SUBMIT_MAX_RETRIES = 5
 _SUBMIT_RETRY_BASE = 2.0
 _SUBMIT_RETRY_MAX = 60.0
+
+# 429 on submit is backpressure, not an error: with cap-aware pacing the
+# client believes it holds a slot, so a 429 means the server's in-flight
+# count disagrees (stale rows, a parallel session, a web upload). Slots
+# free on job-completion timescales (minutes), so the file waits its turn
+# with jittered backoff and NO attempt budget. The only bound is batch
+# liveness: if nothing in the whole run has reserved a slot or reached a
+# terminal state for this long while submits are still refused, the cap
+# is provably stuck and waiting files fail with a pointed message.
+_RATE_LIMIT_RETRY_BASE = 5.0    # matches the server's Retry-After hint
+_RATE_LIMIT_RETRY_MAX = 60.0
+_RATE_LIMIT_STALL_BUDGET = 30 * 60.0
 
 # Download retries — bounded, for transient network errors while fetching
 # results. Exhausted retries mark the file failed for this run; a re-run
@@ -99,6 +110,25 @@ class BatchResult:
     job_ids: dict[str, str] = field(default_factory=dict)
     workdir: Optional[Path] = None
     manifest: Optional[Manifest] = None
+
+
+class _BatchPulse:
+    """Batch-wide liveness clock for 429 backpressure decisions.
+
+    Beats when server-side capacity provably moved: a submit reserved a
+    slot, or a poll saw a job reach a terminal state (which frees one).
+    Files waiting out a 429 consult `stalled_for()` to distinguish "cap
+    full but flowing" (keep waiting) from "cap stuck" (give up).
+    """
+
+    def __init__(self) -> None:
+        self.last_progress = time.monotonic()
+
+    def beat(self) -> None:
+        self.last_progress = time.monotonic()
+
+    def stalled_for(self) -> float:
+        return time.monotonic() - self.last_progress
 
 
 async def run_batch(
@@ -153,11 +183,12 @@ async def run_batch(
     # status it no longer consumes the server cap, so we don't have to hold
     # cap_sem through download). Result: file 1's download runs in parallel
     # with file 2's submit+poll, instead of serializing.
+    pulse = _BatchPulse()
     await asyncio.gather(*(
         _process_one_safe(
             name, files_by_name[name], client,
             cap_sem, download_sem,
-            manifest, save_lock, output_dir, workdir, on_progress,
+            manifest, save_lock, output_dir, workdir, pulse, on_progress,
         )
         for name in files_by_name
     ))
@@ -169,7 +200,7 @@ async def _process_one_safe(
     name: str, file_path: Path, client: APIClientAsync,
     cap_sem: asyncio.Semaphore, download_sem: asyncio.Semaphore,
     manifest: Manifest, save_lock: asyncio.Lock,
-    output_dir: Path, workdir: Path,
+    output_dir: Path, workdir: Path, pulse: _BatchPulse,
     on_progress: Optional[Callable[[Manifest], None]] = None,
 ) -> None:
     """Last-resort firewall around one file's lifecycle.
@@ -182,7 +213,7 @@ async def _process_one_safe(
     try:
         await _process_one(
             name, file_path, client, cap_sem, download_sem,
-            manifest, save_lock, output_dir, workdir, on_progress,
+            manifest, save_lock, output_dir, workdir, pulse, on_progress,
         )
     except Exception as exc:
         logger.error("unexpected error on %s: %r", name, exc)
@@ -198,7 +229,7 @@ async def _process_one(
     name: str, file_path: Path, client: APIClientAsync,
     cap_sem: asyncio.Semaphore, download_sem: asyncio.Semaphore,
     manifest: Manifest, save_lock: asyncio.Lock,
-    output_dir: Path, workdir: Path,
+    output_dir: Path, workdir: Path, pulse: _BatchPulse,
     on_progress: Optional[Callable[[Manifest], None]] = None,
 ) -> None:
     """Per-file lifecycle: submit → poll → download.
@@ -212,13 +243,14 @@ async def _process_one(
     async with cap_sem:
         if manifest.needs_submit(name):
             await _submit_one(
-                name, file_path, client, manifest, save_lock, output_dir, on_progress,
+                name, file_path, client, manifest, save_lock, output_dir,
+                pulse, on_progress,
             )
         # If submit succeeded, status is now SUBMITTED → needs_poll is True.
         # If submit failed, no job_id was set → needs_poll is False, skip.
         if manifest.needs_poll(name):
             await _poll_one(
-                name, client, manifest, save_lock, output_dir, on_progress,
+                name, client, manifest, save_lock, output_dir, pulse, on_progress,
             )
 
     # Download under download_sem (no server cap consumed; just bandwidth)
@@ -239,16 +271,20 @@ async def _submit_one(
     name: str, file_path: Path, client: APIClientAsync,
     manifest: Manifest,
     save_lock: asyncio.Lock, output_dir: Path,
+    pulse: _BatchPulse,
     on_progress: Optional[Callable[[Manifest], None]] = None,
 ) -> None:
-    """Submit one file with exponential-backoff retry on transient errors.
+    """Submit one file, waiting out 429 backpressure and retrying
+    transient errors with exponential backoff.
 
     Caller is expected to hold the per-file semaphore (`_submit_and_poll`
     wraps this in `async with sem:`) so the slot is reserved for the
     entire submit + poll lifecycle, matching the server's cap semantics.
     """
     delay = _SUBMIT_RETRY_BASE
-    for attempt in range(1, _SUBMIT_MAX_RETRIES + 1):
+    rl_delay = _RATE_LIMIT_RETRY_BASE
+    transient_attempts = 0
+    while True:
         try:
             data = await client.create_job([file_path])
             job_id = data.get("job_id") if isinstance(data, dict) else None
@@ -256,6 +292,7 @@ async def _submit_one(
                 # Server accepted the POST but broke its contract — treat
                 # like a 5xx so the existing transient retry applies.
                 raise ServerError("Server accepted the upload but returned no job id")
+            pulse.beat()  # a slot was reserved — the cap is flowing
             async with save_lock:
                 e = manifest.jobs[name]
                 e.job_id = job_id
@@ -275,13 +312,36 @@ async def _submit_one(
             _emit_progress(on_progress, manifest)
             logger.info("submitted %s → job %s", name, job_id[:8])
             return
-        except (RateLimitError, ServerError, httpx.TransportError) as exc:
-            if attempt >= _SUBMIT_MAX_RETRIES:
+        except RateLimitError as exc:
+            # Backpressure, not an error: the server's in-flight count is
+            # at the cap (stale rows, a parallel session, a web upload).
+            # Slots free on job-completion timescales, so wait — jittered
+            # so concurrent waiters don't retry in synchronised waves —
+            # for as long as the batch shows life. No attempt budget.
+            if pulse.stalled_for() > _RATE_LIMIT_STALL_BUDGET:
+                await _mark_submit_failed(
+                    name,
+                    "concurrency cap appears stuck — no job in this run "
+                    f"reserved a slot or completed for {int(_RATE_LIMIT_STALL_BUDGET // 60)} "
+                    "minutes while submits were rate-limited. Check the admin "
+                    "jobs list for stale queued/processing jobs.",
+                    manifest, save_lock, output_dir, on_progress,
+                )
+                return
+            wait = rl_delay * (0.5 + random.random())
+            logger.info(
+                "cap full — %s waiting %.1fs for a slot (%s)", name, wait, exc,
+            )
+            await asyncio.sleep(wait)
+            rl_delay = min(rl_delay * 2, _RATE_LIMIT_RETRY_MAX)
+        except (ServerError, httpx.TransportError) as exc:
+            transient_attempts += 1
+            if transient_attempts >= _SUBMIT_MAX_RETRIES:
                 await _mark_submit_failed(name, str(exc), manifest, save_lock, output_dir, on_progress)
                 return
             logger.warning(
                 "transient submit error on %s (%s) — retry %d/%d in %.1fs",
-                name, exc, attempt, _SUBMIT_MAX_RETRIES, delay,
+                name, exc, transient_attempts, _SUBMIT_MAX_RETRIES, delay,
             )
             await asyncio.sleep(delay)
             delay = min(delay * 2, _SUBMIT_RETRY_MAX)
@@ -321,6 +381,7 @@ async def _mark_submit_failed(
 async def _poll_one(
     name: str, client: APIClientAsync, manifest: Manifest,
     save_lock: asyncio.Lock, output_dir: Path,
+    pulse: Optional[_BatchPulse] = None,
     on_progress: Optional[Callable[[Manifest], None]] = None,
 ) -> None:
     """Poll one job until it reaches a terminal state.
@@ -420,6 +481,8 @@ async def _poll_one(
         _emit_progress(on_progress, manifest)
 
         if status in (STATUS_COMPLETED, STATUS_FAILED):
+            if pulse is not None:
+                pulse.beat()  # terminal state frees a server-side slot
             return
 
         await asyncio.sleep(interval)
