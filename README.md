@@ -74,7 +74,7 @@ for f in result.files:
 
 ## Folder / Batch Processing
 
-Pass a directory path to process multiple files together. The SDK processes files in parallel and merges the outputs locally into a single ground profile Excel, test data Excel, and AGS file. One annotated PDF per input file.
+Pass a directory path to process multiple files together. The SDK processes files in parallel and merges the outputs locally into a single ground profile Excel, test data Excel, AGS file, and data JSON. Annotated PDFs are collected in an `annotated_pdf/` subfolder, one per input file.
 
 ```python
 result = client.process_documents(
@@ -86,9 +86,11 @@ result = client.process_documents(
 #   Borehole_ground_profile_merged.xlsx
 #   Borehole_test_data_merged.xlsx
 #   Borehole_ags4_merged.ags
-#   BH01_annotated.pdf              (one per input file)
-#   BH02_annotated.pdf
-#   BH03_annotated.pdf
+#   Borehole_data_merged.json
+#   annotated_pdf/
+#     BH01_annotated.pdf            (one per input file)
+#     BH02_annotated.pdf
+#     BH03_annotated.pdf
 ```
 
 A single-file run keeps the original filenames (no `_merged` suffix).
@@ -105,9 +107,25 @@ client.process_documents("./logs/", output_dir="./results")
 client.process_documents("./logs/", output_dir="./results")
 ```
 
+## Incremental Runs
+
+The SDK keeps its resume state (`.boreholeai_manifest.json` plus a `.boreholeai_workdir/` cache) after a successful run, so you can add more files to the same folder later and simply re-run: completed files are skipped, only new or changed files are processed, and the merged outputs are regenerated to cover everything. A file whose content changed on disk is detected and re-processed automatically; to force a single file to re-run by hand, set `"reprocess": true` on its entry in `.boreholeai_manifest.json`.
+
+Once every file has completed, a run at an interactive terminal asks whether to clean up the resume state. You can also decide in code and skip the question:
+
+```python
+# Keep state, never ask — incremental mode for scripts
+client.process_documents("./logs/", output_dir="./results", finalise_and_cleanup=False)
+
+# Clean up on success, never ask — one-shot mode
+client.process_documents("./logs/", output_dir="./results", finalise_and_cleanup=True)
+```
+
+Each `output_dir` is tied to one input folder — re-using a kept `output_dir` with a different input folder raises an error instead of silently mixing results.
+
 ## Partial Failure Handling
 
-If some files fail server-side processing (bad scan, unreadable layout, etc.), the rest are merged normally and the failed files are reported via `result.failures`. The call only raises if every file fails.
+If some files fail server-side processing (bad scan, unreadable layout, etc.), the rest are merged normally and the failed files are reported via `result.failures` with a `"partial"` status; if every file fails the status is `"failed"`. Failed files are retried automatically the next time you re-run with the same `output_dir`.
 
 A `merge_warnings.txt` file is written to `output_dir` only when warnings occur during merge (e.g. a job missing one of its result files).
 
