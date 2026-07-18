@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import shutil
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -74,14 +75,16 @@ _RATE_LIMIT_RETRY_MAX = 60.0
 _RATE_LIMIT_STALL_BUDGET = 30 * 60.0
 
 # Stuck-job guard. A live job's poll responses change constantly (status
-# transitions, page/subgraph progress stamps); a job whose worker died
-# mid-flight answers "processing" with frozen progress forever. If nothing
-# observable changes for the budget, fail the file client-side and release
-# its slot. 35 min is deliberately ABOVE the server's stale-job self-heal
-# threshold (28 min + a <=5 min sweep), so the server gets first crack:
-# a rescued job resumes invisibly (the requeue resets this clock) and the
-# client guard only fires when the server couldn't help. Queued jobs get
-# a longer leash: waiting behind a deep queue is legitimate stillness.
+# transitions, page/subgraph progress stamps, and — on servers that expose
+# updated_at — a once-a-minute worker liveness heartbeat); a job whose
+# worker died mid-flight answers "processing" with frozen fields forever.
+# If nothing observable changes for the budget, fail the file client-side
+# and release its slot. 35 min is deliberately ABOVE the server's stale-job
+# self-heal threshold (10 min of heartbeat silence + a <=5 min sweep), so
+# the server gets first crack: a rescued job resumes invisibly (the requeue
+# resets this clock) and the client guard only fires when the server
+# couldn't help. Queued jobs get a longer leash: waiting behind a deep
+# queue is legitimate stillness.
 _STUCK_PROCESSING_BUDGET = 35 * 60.0
 _STUCK_QUEUED_BUDGET = 120 * 60.0
 
@@ -111,6 +114,42 @@ _KNOWN_POLL_STATUSES = (
 )
 
 _WORKDIR_NAME = ".boreholeai_workdir"
+_UNSAFE_WORKDIR_CHARS = '<>:"/\\|?*' + "".join(
+    chr(c) for c in range(0x00, 0x20)
+)
+_WORKDIR_TRANS = str.maketrans({c: "_" for c in _UNSAFE_WORKDIR_CHARS})
+
+
+def _job_workdir_candidates(
+    workdir: Path, filename: str, job_id: str,
+) -> tuple[Path, Path]:
+    """Return the labelled and legacy cache paths for one job."""
+    labelled_component = f"{filename} {job_id}".translate(_WORKDIR_TRANS)
+    legacy_component = str(job_id).translate(_WORKDIR_TRANS)
+    return workdir / labelled_component, workdir / legacy_component
+
+
+def _job_workdir(workdir: Path, filename: str, job_id: str) -> Path:
+    """Return the per-job cache directory.
+
+    New SDK runs use ``<filename> <job_id>`` so a person inspecting the
+    cache can identify each job without opening the manifest. If an older
+    job-id-only directory already exists, keep reading/writing it so an SDK
+    upgrade never breaks an in-progress resume.
+    """
+    labelled, legacy = _job_workdir_candidates(workdir, filename, job_id)
+    if not labelled.exists() and legacy.exists():
+        return legacy
+    return labelled
+
+
+def _remove_job_workdirs(workdir: Path, filename: str, job_id: str) -> None:
+    """Remove all client-side cache layouts belonging to an old job."""
+    for path in _job_workdir_candidates(workdir, filename, job_id):
+        if path.is_dir():
+            shutil.rmtree(path)
+        elif path.exists():
+            path.unlink()
 
 
 @dataclass
@@ -307,6 +346,7 @@ async def _submit_one(
             pulse.beat()  # a slot was reserved — the cap is flowing
             async with save_lock:
                 e = manifest.jobs[name]
+                old_job_id = e.job_id if e.reprocess else None
                 e.job_id = job_id
                 e.num_pages = data.get("num_pages")
                 e.status = STATUS_SUBMITTED
@@ -321,7 +361,29 @@ async def _submit_one(
                 e.purged = False
                 e.reprocess = False
                 e.warning = None
+                e.completed_at = None
+                e.pages_done = 0
+                e.current_page = 1
+                e.pages_total = e.num_pages or 1
+                e.completed_subgraphs = []
                 _manifest.save(manifest, output_dir)
+            if old_job_id and old_job_id != job_id:
+                try:
+                    _remove_job_workdirs(
+                        output_dir / _WORKDIR_NAME, name, old_job_id,
+                    )
+                    logger.info(
+                        "removed old client cache for %s → job %s",
+                        name, old_job_id[:8],
+                    )
+                except OSError as exc:
+                    # The replacement job is already accepted and persisted.
+                    # Keep processing it; a stale cache folder is isolated by
+                    # job ID and can never participate in the active merge.
+                    logger.warning(
+                        "could not remove old client cache for %s (job %s): %s",
+                        name, old_job_id[:8], exc,
+                    )
             _emit_progress(on_progress, manifest)
             logger.info("submitted %s → job %s", name, job_id[:8])
             return
@@ -495,6 +557,10 @@ async def _poll_one(
             observed = (
                 status, e.current_page, e.pages_total,
                 tuple(e.completed_subgraphs), e.pages_done,
+                # Server liveness heartbeat (newer servers stamp this every
+                # minute while a worker is alive). Absent on older servers,
+                # where the guard falls back to progress changes alone.
+                data.get("updated_at"),
             )
             _manifest.save(manifest, output_dir)
         _emit_progress(on_progress, manifest)
@@ -563,8 +629,9 @@ async def _download_one(
     output_dir: Path, workdir: Path,
     on_progress: Optional[Callable[[Manifest], None]] = None,
 ) -> None:
-    """Fetch signed URLs, download every file into workdir/{job_id}/, and
-    optionally call DELETE for the enterprise purge-on-download flow.
+    """Fetch signed URLs, download files into
+    ``workdir/<filename> <job_id>/``, and optionally call DELETE for the
+    enterprise purge-on-download flow.
 
     Caller is expected to hold the per-file download semaphore
     (`_process_one` wraps this in `async with download_sem:`).
@@ -573,7 +640,7 @@ async def _download_one(
     if job_id is None:
         return
 
-    job_workdir = workdir / job_id
+    job_workdir = _job_workdir(workdir, name, job_id)
     job_workdir.mkdir(parents=True, exist_ok=True)
 
     try:
