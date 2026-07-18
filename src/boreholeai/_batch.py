@@ -77,10 +77,12 @@ _RATE_LIMIT_STALL_BUDGET = 30 * 60.0
 # transitions, page/subgraph progress stamps); a job whose worker died
 # mid-flight answers "processing" with frozen progress forever. If nothing
 # observable changes for the budget, fail the file client-side and release
-# its slot — the server-side row still needs an admin requeue or the
-# backend's stale-job self-heal. Queued jobs get a longer leash: waiting
-# behind a deep queue is legitimate stillness.
-_STUCK_PROCESSING_BUDGET = 30 * 60.0
+# its slot. 18 min is deliberately ABOVE the server's stale-job self-heal
+# threshold (12 min + a <=5 min sweep), so the server gets first crack:
+# a rescued job resumes invisibly (the requeue resets this clock) and the
+# client guard only fires when the server couldn't help. Queued jobs get
+# a longer leash: waiting behind a deep queue is legitimate stillness.
+_STUCK_PROCESSING_BUDGET = 18 * 60.0
 _STUCK_QUEUED_BUDGET = 120 * 60.0
 
 # Download retries — bounded, for transient network errors while fetching
