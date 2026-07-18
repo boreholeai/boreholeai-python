@@ -256,8 +256,10 @@ async def test_all_files_complete(files, tmp_path, fast_polls):
     assert result.failures == {}
     assert len(result.job_ids) == 3
     # Each job's workdir contains the downloaded file
-    for jid in result.job_ids.values():
-        assert (result.workdir / jid / "Borehole_ags4.ags").exists()
+    for name, jid in result.job_ids.items():
+        assert (
+            result.workdir / f"{name} {jid}" / "Borehole_ags4.ags"
+        ).exists()
 
 
 async def test_manifest_persisted_after_run(files, tmp_path, fast_polls):
@@ -542,7 +544,9 @@ async def test_download_traversal_filename_stays_in_workdir(files, tmp_path, fas
 
     assert result.successes == ["a.pdf"]
     job_id = result.manifest.jobs["a.pdf"].job_id
-    assert (out / ".boreholeai_workdir" / job_id / "evil.ags").exists()
+    assert (
+        out / ".boreholeai_workdir" / f"a.pdf {job_id}" / "evil.ags"
+    ).exists()
     assert not (out / "evil.ags").exists()  # escape attempt contained
 
 
@@ -726,8 +730,21 @@ async def test_reprocess_flag_forces_rerun_and_redownload(
     pre.jobs["a.pdf"].status = _manifest.STATUS_COMPLETED
     pre.jobs["a.pdf"].downloaded = True
     pre.jobs["a.pdf"].purged = True
+    pre.jobs["a.pdf"].completed_at = "2026-01-01T00:00:00+00:00"
+    pre.jobs["a.pdf"].pages_done = 3
+    pre.jobs["a.pdf"].current_page = 3
+    pre.jobs["a.pdf"].pages_total = 3
+    pre.jobs["a.pdf"].completed_subgraphs = ["SG01", "SG02"]
     pre.jobs["a.pdf"].reprocess = True   # the manual edit
     _manifest.save(pre, out)
+    labelled_old_cache = (
+        out / ".boreholeai_workdir" / "a.pdf old-completed-job"
+    )
+    legacy_old_cache = out / ".boreholeai_workdir" / "old-completed-job"
+    labelled_old_cache.mkdir(parents=True)
+    legacy_old_cache.mkdir()
+    (labelled_old_cache / "stale-result.ags").write_text("stale")
+    (legacy_old_cache / "stale-result.ags").write_text("stale")
 
     server = FakeServer(complete_after_polls=1)
     async with _client(server) as client:
@@ -739,7 +756,11 @@ async def test_reprocess_flag_forces_rerun_and_redownload(
     assert entry.job_id != "old-completed-job"
     assert entry.downloaded  # new job's results actually downloaded
     assert entry.reprocess is False  # flag consumed — won't loop forever
-    assert (Path(result.workdir) / entry.job_id).exists()
+    assert entry.completed_at != "2026-01-01T00:00:00+00:00"
+    assert entry.completed_subgraphs == []
+    assert not labelled_old_cache.exists()
+    assert not legacy_old_cache.exists()
+    assert (Path(result.workdir) / f"a.pdf {entry.job_id}").exists()
 
 
 async def test_resume_continues_polling_existing_job(files, tmp_path, fast_polls):

@@ -126,9 +126,14 @@ def test_no_ags_anywhere_omits_ags_output(tmp_path):
 
 def test_dir_labels_used_in_warnings(tmp_path):
     """Warnings should show the caller-provided label, not the dir UUID."""
-    # Use UUID-shaped dir names to mimic real workdir/{job_id}/
-    j1 = _make_job_dir(tmp_path / "1baf6345-ae8b-455f-8083-5f4cbd5ce382")
-    j2 = _make_job_dir(tmp_path / "9c3a1234-aaaa-bbbb-cccc-eeeeffff1111", ags=False)
+    # Match the SDK's real workdir/<filename> <job_id>/ naming convention.
+    j1 = _make_job_dir(
+        tmp_path / "AU-BH401.pdf 1baf6345-ae8b-455f-8083-5f4cbd5ce382"
+    )
+    j2 = _make_job_dir(
+        tmp_path / "AU-BH402.pdf 9c3a1234-aaaa-bbbb-cccc-eeeeffff1111",
+        ags=False,
+    )
     out = tmp_path / "out"
     labels = {j1: "AU-BH401.pdf", j2: "AU-BH402.pdf"}
 
