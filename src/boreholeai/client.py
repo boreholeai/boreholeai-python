@@ -6,6 +6,7 @@ import asyncio
 import shutil
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -46,6 +47,13 @@ _BAR_EMPTY = "░"
 # stutter over slow terminals (SSH, recorders).
 _RENDER_MIN_INTERVAL = 0.25
 
+# Leave a little vertical breathing room below the live frame.  More
+# importantly, this guarantees that every cursor-up command refers only to
+# rows that are still on the visible screen; terminals cannot move the cursor
+# into scrollback history.
+_LIVE_VERTICAL_MARGIN = 2
+_LIVE_INDENT = "        "
+
 # Strip C0/C1 control characters from filenames before printing them, so
 # a malicious filename can't inject ANSI escape sequences into the user's
 # terminal (clear screen, hide cursor, OSC commands, etc.).
@@ -56,6 +64,11 @@ _CONTROL_TRANS = str.maketrans({c: "?" for c in _CONTROL_CHARS})
 def _safe_filename(name: str) -> str:
     """Replace control characters in a filename for safe terminal display."""
     return name.translate(_CONTROL_TRANS)
+
+
+def _safe_terminal_text(text: str) -> str:
+    """Replace control characters in arbitrary server-provided display text."""
+    return text.translate(_CONTROL_TRANS)
 
 
 class BoreholeAI:
@@ -342,11 +355,17 @@ def _fmt_progress(seconds: float) -> str:
 
 
 class _PerFileProgress:
-    """Live multi-line progress display, one line per input file.
+    """Terminal-aware per-file progress display.
 
-    Re-renders the block in place using ANSI cursor movement after each
-    state change. Non-TTY callers should not construct this — `client.py`
-    only instantiates it when `sys.stderr.isatty()`.
+    Small batches keep the familiar one-row-per-file live display.  When the
+    batch is taller than the terminal, the live frame contains a summary and
+    only non-terminal files, capped to the visible height.  Once everything
+    finishes, the live frame is cleared and every file is printed once as an
+    append-only final report.  The final report may scroll, but is never used
+    as the target of an ANSI cursor-up redraw.
+
+    Non-TTY callers should not construct this — `client.py` only instantiates
+    it when `sys.stderr.isatty()`.
     """
 
     def __init__(self, started_at: float):
@@ -372,7 +391,7 @@ class _PerFileProgress:
         self._final_frame_drawn: bool = False
 
     def update(self, manifest: Manifest) -> None:
-        """Re-draw all per-file lines based on current manifest state."""
+        """Update the bounded live frame or print the final report once."""
         if not self._order:
             self._order = list(manifest.jobs.keys())
 
@@ -407,30 +426,145 @@ class _PerFileProgress:
         if all_terminal:
             self._final_frame_drawn = True
 
-        # Move cursor up to the top of the previously drawn block, clear,
-        # then re-draw every line. Each redraw is one frame.
-        if self._lines_drawn > 0:
-            sys.stderr.write(f"\033[{self._lines_drawn}A")
+        terminal = shutil.get_terminal_size(fallback=(80, 24))
+        max_live_lines = max(1, terminal.lines - _LIVE_VERTICAL_MARGIN)
 
-        max_name_len = min(40, max((len(n) for n in self._order), default=10))
+        if all_terminal:
+            self._clear_live_frame(max_live_lines)
+            self._write_final_report(manifest, now)
+            return
+
+        lines = self._live_lines(manifest, now, max_live_lines)
+        self._redraw_live_frame(lines, terminal.columns, max_live_lines)
+
+    def _live_lines(
+        self, manifest: Manifest, now: float, max_live_lines: int,
+    ) -> list[str]:
+        """Build a live frame that never exceeds the terminal height."""
+        existing = [name for name in self._order if name in manifest.jobs]
+        if len(existing) <= max_live_lines:
+            names = existing
+            summary = None
+        else:
+            active = [
+                name for name in existing
+                if manifest.jobs[name].status != STATUS_PENDING
+                and not _file_is_terminal(manifest.jobs[name])
+            ]
+            active_capacity = max(0, max_live_lines - 1)
+            names = active[:active_capacity]
+            summary = self._summary_line(manifest, len(names), len(active))
+
+        max_name_len = min(40, max((len(n) for n in existing), default=10))
         index_width = len(str(len(self._order)))
-        rendered = 0
+        positions = {name: i for i, name in enumerate(self._order, start=1)}
+        lines = [summary] if summary is not None else []
+        for name in names:
+            entry = manifest.jobs[name]
+            elapsed = self._elapsed(name, entry, now)
+            elapsed_in_sg = self._elapsed_in_current_sg(name, entry, now)
+            lines.append(self._format_line(
+                positions[name], name, entry, index_width, max_name_len,
+                elapsed, elapsed_in_sg,
+            ))
+        return lines
+
+    def _summary_line(
+        self, manifest: Manifest, shown_active: int, active_count: int,
+    ) -> str:
+        entries = [manifest.jobs[n] for n in self._order if n in manifest.jobs]
+        succeeded = sum(
+            e.status == STATUS_COMPLETED and e.downloaded and not e.reprocess
+            for e in entries
+        )
+        failed = sum(
+            e.status in (STATUS_FAILED, STATUS_SUBMIT_FAILED) for e in entries
+        )
+        waiting = sum(e.status == STATUS_PENDING for e in entries)
+        summary = (
+            f"Files: {succeeded}/{len(entries)} succeeded · {failed} failed · "
+            f"{active_count} active · {waiting} waiting"
+        )
+        if shown_active < active_count:
+            summary += f" · showing {shown_active}/{active_count} active"
+        return summary
+
+    def _redraw_live_frame(
+        self, lines: list[str], terminal_width: int, max_live_lines: int,
+    ) -> None:
+        """Replace the prior bounded frame without addressing scrollback."""
+        # A terminal resize can make the old frame taller than the new screen.
+        # It is no longer safe to address those rows, so abandon that frame and
+        # append the new bounded one.  This can leave one stale frame after a
+        # resize, but prevents the repeating/scrollback corruption entirely.
+        if self._lines_drawn > max_live_lines:
+            self._lines_drawn = 0
+
+        previous = self._lines_drawn
+        if previous:
+            sys.stderr.write(f"\033[{previous}A")
+
+        content_width = max(1, terminal_width - len(_LIVE_INDENT))
+        for line in lines:
+            fitted = _fit_terminal_width(line, content_width)
+            sys.stderr.write(f"\r\033[K{_LIVE_INDENT}{fitted}\n")
+
+        # If the new frame is shorter, erase the old tail and restore the
+        # cursor to immediately below the new frame.
+        surplus = previous - len(lines)
+        for _ in range(max(0, surplus)):
+            sys.stderr.write("\r\033[K\n")
+        if surplus > 0:
+            sys.stderr.write(f"\033[{surplus}A")
+
+        sys.stderr.flush()
+        self._lines_drawn = len(lines)
+
+    def _clear_live_frame(self, max_live_lines: int) -> None:
+        """Erase the bounded live frame before append-only final output."""
+        if not self._lines_drawn:
+            return
+        if self._lines_drawn > max_live_lines:
+            # The terminal was resized and some rows may now be in scrollback.
+            # Never issue an unsafe cursor-up command for them.
+            self._lines_drawn = 0
+            return
+        sys.stderr.write(f"\033[{self._lines_drawn}A")
+        for _ in range(self._lines_drawn):
+            sys.stderr.write("\r\033[K\n")
+        self._lines_drawn = 0
+
+    def _write_final_report(self, manifest: Manifest, now: float) -> None:
+        """Print every final row once; scrolling is safe because it is static."""
+        existing = [name for name in self._order if name in manifest.jobs]
+        max_name_len = min(40, max((len(n) for n in existing), default=10))
+        index_width = len(str(len(self._order)))
         for index, name in enumerate(self._order, start=1):
             entry = manifest.jobs.get(name)
             if entry is None:
                 continue
-            end_time = self._file_ended.get(name, now)
-            elapsed = end_time - self._file_started.get(name, now)
+            elapsed = self._elapsed(name, entry, now)
             elapsed_in_sg = self._elapsed_in_current_sg(name, entry, now)
             line = self._format_line(
                 index, name, entry, index_width, max_name_len,
                 elapsed, elapsed_in_sg,
             )
-            sys.stderr.write(f"\r\033[K        {line}\n")
-            rendered += 1
-
+            sys.stderr.write(f"{_LIVE_INDENT}{line}\n")
         sys.stderr.flush()
-        self._lines_drawn = rendered
+
+    def _elapsed(self, name: str, entry, now: float) -> float:
+        """Elapsed time, preferring persisted timestamps for resume accuracy."""
+        submitted = _parse_manifest_time(entry.submitted_at)
+        if submitted is not None:
+            completed = (
+                _parse_manifest_time(entry.completed_at)
+                if _file_is_terminal(entry) else None
+            )
+            end = completed or datetime.now(timezone.utc)
+            return max(0.0, (end - submitted).total_seconds())
+
+        end_time = self._file_ended.get(name, now)
+        return max(0.0, end_time - self._file_started.get(name, now))
 
     def _elapsed_in_current_sg(self, name: str, entry, now: float) -> float:
         """Seconds since the last time `entry.completed_subgraphs` grew.
@@ -492,10 +626,34 @@ class _PerFileProgress:
                 return "✓ done"
             return _bar_full() + "  downloading…"
         if s == STATUS_FAILED:
-            return f"✗ failed ({entry.error or 'unknown error'})"
+            error = _safe_terminal_text(entry.error or "unknown error")
+            return f"✗ failed ({error})"
         if s == STATUS_SUBMIT_FAILED:
-            return f"✗ submit failed ({entry.error or 'unknown error'})"
+            error = _safe_terminal_text(entry.error or "unknown error")
+            return f"✗ submit failed ({error})"
         return s
+
+
+def _parse_manifest_time(value: Optional[str]) -> Optional[datetime]:
+    """Parse an ISO-8601 manifest timestamp, tolerating legacy variants."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _fit_terminal_width(text: str, width: int) -> str:
+    """Keep a live row on one terminal line (best effort for Unicode)."""
+    if len(text) <= width:
+        return text
+    if width <= 1:
+        return text[:width]
+    return text[: width - 1] + "…"
 
 
 def _bar_processing(entry, elapsed_in_sg: float) -> str:
