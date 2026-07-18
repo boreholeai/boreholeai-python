@@ -20,6 +20,7 @@ from boreholeai._batch import (
     resolve_effective_concurrency,
     run_batch,
 )
+from boreholeai import _manifest
 from boreholeai._files import collect_files
 from boreholeai._manifest import (
     STATUS_COMPLETED,
@@ -128,6 +129,7 @@ class BoreholeAI:
         *,
         output_dir: str | Path = _DEFAULT_OUTPUT_DIR,
         finalise_and_cleanup: Optional[bool] = None,
+        retry_failed_pages: Optional[bool] = None,
     ) -> JobResult:
         """Submit, process, and merge a single file or a folder of files.
 
@@ -148,6 +150,16 @@ class BoreholeAI:
                 Any non-answer (Enter, EOF, Ctrl-C, closed window) keeps the
                 state; a later re-run asks again. Cleanup never happens on a
                 partial/failed run regardless of this setting.
+            retry_failed_pages: What to do when a previous run left completed
+                files with failed pages (the 🟡 warnings in the run summary).
+                A re-processed file is submitted as a new job and charged
+                again, like a new file.
+                True — re-process them all, without asking.
+                False — leave them completed; only new/failed files run.
+                None (default) — when running at an interactive terminal,
+                ask once before the run starts. Any non-answer (Enter, EOF,
+                Ctrl-C) leaves them completed; under cron/CI/pipes nothing
+                is asked and nothing is re-charged.
 
         Returns:
             JobResult — `status` is "completed", "partial", or "failed";
@@ -160,6 +172,10 @@ class BoreholeAI:
         files = collect_files(input_path)
         out = Path(output_dir).resolve()
         out.mkdir(parents=True, exist_ok=True)
+
+        _maybe_flag_failed_page_retries(
+            out, {f.name for f in files}, retry_failed_pages,
+        )
 
         start = time.monotonic()
 
@@ -250,6 +266,10 @@ class BoreholeAI:
             _log(f"🟡 {len(page_warnings)} completed file(s) have failed pages:")
             for name, w in page_warnings.items():
                 _log(f"  {name}: {w}")
+            _log(
+                "  Re-run the same call to be offered a retry of these "
+                "files (or pass retry_failed_pages=True)"
+            )
         if merged_files:
             _log(f"🟢 Saved {len(merged_files)} file(s) to {output_dir}")
             for f in merged_files:
@@ -329,6 +349,74 @@ def _prompt_cleanup(n_files: int) -> bool:
     print(
         f"  All {n_files} file(s) completed — clean up the manifest and "
         f"working file cache? [y/N] ",
+        end="", file=sys.stderr, flush=True,
+    )
+    try:
+        answer = input()
+    except (EOFError, KeyboardInterrupt):
+        print(file=sys.stderr)
+        return False
+    return answer.strip().lower() in ("y", "yes")
+
+
+def _maybe_flag_failed_page_retries(
+    output_dir: Path, input_names: set[str], decision: Optional[bool],
+) -> None:
+    """Flag completed-with-failed-pages entries for re-processing.
+
+    Runs before the batch starts so the resume logic sees the flags and
+    resubmits those files through the normal `reprocess` path. `decision`
+    mirrors `finalise_and_cleanup`: True flags without asking, False
+    touches nothing, None asks at an interactive terminal and touches
+    nothing everywhere else — an unattended run never re-charges files
+    without an explicit True. Only files present in the current input
+    (`input_names`) are counted or flagged; anything else in the manifest
+    couldn't be resubmitted this run anyway.
+    """
+    if decision is False:
+        return
+    manifest = _manifest.load(output_dir)
+    if manifest is None:
+        return
+    candidates = {
+        name: entry
+        for name, entry in manifest.jobs.items()
+        if name in input_names
+        and entry.status == STATUS_COMPLETED
+        and entry.warning
+        and not entry.reprocess
+    }
+    if not candidates:
+        return
+    if decision is None and not _prompt_retry_failed_pages(candidates):
+        return
+    for entry in candidates.values():
+        entry.reprocess = True
+    _manifest.save(manifest, output_dir)
+    _log(
+        f"🟡 {len(candidates)} file(s) with failed pages queued for "
+        f"reprocessing"
+    )
+
+
+def _prompt_retry_failed_pages(
+    candidates: dict[str, _manifest.JobEntry],
+) -> bool:
+    """Ask an interactive user whether to re-process completed files whose
+    pages failed extraction.
+
+    Mirrors `_prompt_cleanup`: only asks when both stdin and stderr are
+    terminals — under cron/CI/pipes this returns False without blocking.
+    Any non-answer (empty, EOF, Ctrl-C, unrecognised input) also means no:
+    saying yes re-submits every listed file as a fresh job, which deducts
+    credits again, so the conservative default is to leave them alone.
+    """
+    if not (sys.stdin.isatty() and sys.stderr.isatty()):
+        return False
+    est_credits = sum((e.num_pages or 1) for e in candidates.values())
+    print(
+        f"  🟡 {len(candidates)} previously completed file(s) have failed "
+        f"pages — re-process them? Uses ~{est_credits} credit(s) [y/N] ",
         end="", file=sys.stderr, flush=True,
     )
     try:

@@ -486,3 +486,133 @@ def test_final_cleanup_run_resubmits_nothing_and_cleans(tmp_path, fast_polls):
 def test_empty_api_key_rejected():
     with pytest.raises(ValueError, match="api_key is required"):
         BoreholeAI(api_key="")
+
+
+# --- retry_failed_pages (pre-flight flagging of completed files with failed pages) ---
+
+def _seed_warned_manifest(out: Path) -> None:
+    """Manifest with one warned+completed, one clean, one failed, and one
+    warned entry whose source file is no longer in the input set."""
+    m = Manifest(jobs={
+        "warned.pdf": JobEntry(
+            status=STATUS_COMPLETED, downloaded=True, job_id="j1",
+            num_pages=3, warning="1 of 3 borehole page(s) failed extraction",
+        ),
+        "clean.pdf": JobEntry(
+            status=STATUS_COMPLETED, downloaded=True, job_id="j2", num_pages=2,
+        ),
+        "failed.pdf": JobEntry(status=STATUS_FAILED, job_id="j3", error="boom"),
+        "gone.pdf": JobEntry(
+            status=STATUS_COMPLETED, downloaded=True, job_id="j4",
+            num_pages=1, warning="1 of 1 borehole page(s) failed extraction",
+        ),
+    })
+    _client_mod._manifest.save(m, out)
+
+
+_INPUT_NAMES = {"warned.pdf", "clean.pdf", "failed.pdf"}  # gone.pdf removed
+
+
+def test_retry_failed_pages_true_flags_only_warned_completed_in_input(tmp_path):
+    _seed_warned_manifest(tmp_path)
+
+    _client_mod._maybe_flag_failed_page_retries(tmp_path, _INPUT_NAMES, True)
+
+    m = _client_mod._manifest.load(tmp_path)
+    assert m.jobs["warned.pdf"].reprocess is True
+    assert m.jobs["clean.pdf"].reprocess is False
+    assert m.jobs["failed.pdf"].reprocess is False
+    assert m.jobs["gone.pdf"].reprocess is False  # not in current input
+
+
+def test_retry_failed_pages_false_touches_nothing(tmp_path):
+    _seed_warned_manifest(tmp_path)
+
+    _client_mod._maybe_flag_failed_page_retries(tmp_path, _INPUT_NAMES, False)
+
+    m = _client_mod._manifest.load(tmp_path)
+    assert all(e.reprocess is False for e in m.jobs.values())
+
+
+def test_retry_failed_pages_default_skips_when_not_interactive(tmp_path, monkeypatch):
+    _seed_warned_manifest(tmp_path)
+    monkeypatch.setattr(_client_mod.sys, "stdin", _FakeTty(tty=False))
+
+    _client_mod._maybe_flag_failed_page_retries(tmp_path, _INPUT_NAMES, None)
+
+    m = _client_mod._manifest.load(tmp_path)
+    assert all(e.reprocess is False for e in m.jobs.values())
+
+
+def test_retry_failed_pages_default_flags_when_prompt_answered_yes(tmp_path, monkeypatch):
+    _seed_warned_manifest(tmp_path)
+    monkeypatch.setattr(
+        _client_mod, "_prompt_retry_failed_pages", lambda candidates: True,
+    )
+
+    _client_mod._maybe_flag_failed_page_retries(tmp_path, _INPUT_NAMES, None)
+
+    m = _client_mod._manifest.load(tmp_path)
+    assert m.jobs["warned.pdf"].reprocess is True
+    assert m.jobs["clean.pdf"].reprocess is False
+
+
+def test_retry_failed_pages_already_flagged_entries_do_not_reprompt(tmp_path, monkeypatch):
+    """Entries the user already flagged by hand are not candidates again."""
+    m = Manifest(jobs={
+        "warned.pdf": JobEntry(
+            status=STATUS_COMPLETED, downloaded=True, job_id="j1",
+            num_pages=3, warning="1 of 3 borehole page(s) failed extraction",
+            reprocess=True,
+        ),
+    })
+    _client_mod._manifest.save(m, tmp_path)
+    called = []
+    monkeypatch.setattr(
+        _client_mod, "_prompt_retry_failed_pages",
+        lambda candidates: called.append(1) or True,
+    )
+
+    _client_mod._maybe_flag_failed_page_retries(tmp_path, {"warned.pdf"}, None)
+
+    assert called == []  # nothing new to ask about
+
+
+def test_retry_failed_pages_no_manifest_is_a_noop(tmp_path):
+    _client_mod._maybe_flag_failed_page_retries(
+        tmp_path / "fresh", {"a.pdf"}, True,
+    )
+    assert not (tmp_path / "fresh").exists()  # nothing created
+
+
+def test_prompt_retry_failed_pages_skips_when_not_a_tty(monkeypatch):
+    monkeypatch.setattr(_client_mod.sys, "stdin", _FakeTty(tty=False))
+    called = []
+    monkeypatch.setattr("builtins.input", lambda *a: called.append(1) or "y")
+
+    assert _client_mod._prompt_retry_failed_pages(
+        {"a.pdf": JobEntry(num_pages=2)},
+    ) is False
+    assert called == []  # input() never reached
+
+
+def test_prompt_retry_failed_pages_answers(monkeypatch):
+    monkeypatch.setattr(_client_mod.sys, "stdin", _FakeTty(tty=True))
+    monkeypatch.setattr(_client_mod.sys, "stderr", _FakeTty(tty=True))
+    candidates = {"a.pdf": JobEntry(num_pages=2), "b.pdf": JobEntry()}
+
+    for answer, expected in [
+        ("y", True), ("YES", True), ("", False), ("n", False), ("what", False),
+    ]:
+        monkeypatch.setattr("builtins.input", lambda *a, _ans=answer: _ans)
+        assert _client_mod._prompt_retry_failed_pages(candidates) is expected
+
+    def _raise_eof(*a):
+        raise EOFError
+    monkeypatch.setattr("builtins.input", _raise_eof)
+    assert _client_mod._prompt_retry_failed_pages(candidates) is False
+
+    def _raise_interrupt(*a):
+        raise KeyboardInterrupt
+    monkeypatch.setattr("builtins.input", _raise_interrupt)
+    assert _client_mod._prompt_retry_failed_pages(candidates) is False

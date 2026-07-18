@@ -18,6 +18,7 @@ from boreholeai._manifest import (
     STATUS_SUBMIT_FAILED,
     JobEntry,
     Manifest,
+    load,
     load_or_init,
     save,
 )
@@ -276,3 +277,30 @@ def test_load_ignores_unknown_fields_in_entry(tmp_path):
     m = load_or_init(out, input_root=tmp_path, concurrency=6, files=[])
     assert m.jobs["a.pdf"].job_id == "u"
     assert m.jobs["a.pdf"].status == STATUS_COMPLETED
+
+
+# --- load (read-only peek) ---
+
+def test_load_returns_none_when_missing(tmp_path):
+    assert load(tmp_path / "nowhere") is None
+
+
+def test_load_reads_back_saved_manifest(tmp_path):
+    files = _files(tmp_path, ["a.pdf"])
+    out = tmp_path / "out"
+    load_or_init(out, input_root=tmp_path, concurrency=6, files=files)
+
+    m = load(out)
+
+    assert m is not None
+    assert set(m.jobs) == {"a.pdf"}
+
+
+def test_load_returns_none_on_corrupt_or_wrong_version(tmp_path):
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / MANIFEST_FILENAME).write_text("{not json")
+    assert load(out) is None
+
+    (out / MANIFEST_FILENAME).write_text(json.dumps({"version": 999}))
+    assert load(out) is None
