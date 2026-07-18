@@ -6,6 +6,8 @@ JobResult, with a fake stateful server via the `_transport` test seam.
 
 from __future__ import annotations
 
+import os
+import re
 from pathlib import Path
 
 import pytest
@@ -13,7 +15,14 @@ import pytest
 from boreholeai import BoreholeAI
 from boreholeai import _batch
 from boreholeai import client as _client_mod
-from boreholeai._manifest import JobEntry, Manifest, STATUS_COMPLETED
+from boreholeai._manifest import (
+    JobEntry,
+    Manifest,
+    STATUS_COMPLETED,
+    STATUS_FAILED,
+    STATUS_PENDING,
+    STATUS_PROCESSING,
+)
 from tests.test_batch import FakeServer  # reuse the fake server
 
 
@@ -260,6 +269,129 @@ def test_reprocess_progress_waits_for_new_job_frame(monkeypatch):
 
     assert "ARU-K-AH21.pdf  queued for reprocessing" in stderr.text
     assert "ARU-K-AH21.pdf  ✓ done" in stderr.text
+
+
+def test_small_progress_batch_keeps_all_live_rows(monkeypatch):
+    """A batch that fits vertically retains the familiar all-file display."""
+    stderr = _RecordingTty()
+    monkeypatch.setattr(_client_mod.sys, "stderr", stderr)
+    monkeypatch.setattr(
+        _client_mod.shutil, "get_terminal_size",
+        lambda fallback: os.terminal_size((219, 17)),
+    )
+    jobs = {
+        f"file-{i:02d}.pdf": JobEntry(
+            status=STATUS_COMPLETED if i <= 4 else STATUS_PROCESSING,
+            downloaded=i <= 4,
+        )
+        for i in range(1, 10)
+    }
+
+    _client_mod._PerFileProgress(started_at=0.0).update(Manifest(jobs=jobs))
+
+    assert stderr.text.count("\n") == 9
+    assert "1. file-01.pdf" in stderr.text
+    assert "9. file-09.pdf" in stderr.text
+    assert "Files:" not in stderr.text
+
+
+def test_large_progress_batch_is_bounded_to_terminal_height(monkeypatch):
+    """A 17-line terminal never receives a live frame taller than 15 rows."""
+    stderr = _RecordingTty()
+    monkeypatch.setattr(_client_mod.sys, "stderr", stderr)
+    monkeypatch.setattr(
+        _client_mod.shutil, "get_terminal_size",
+        lambda fallback: os.terminal_size((219, 17)),
+    )
+    jobs = {}
+    for i in range(1, 31):
+        if i <= 10:
+            jobs[f"file-{i:02d}.pdf"] = JobEntry(
+                status=STATUS_COMPLETED, downloaded=True,
+            )
+        elif i == 30:
+            jobs[f"file-{i:02d}.pdf"] = JobEntry(status=STATUS_PENDING)
+        else:
+            jobs[f"file-{i:02d}.pdf"] = JobEntry(status=STATUS_PROCESSING)
+
+    _client_mod._PerFileProgress(started_at=0.0).update(Manifest(jobs=jobs))
+
+    assert stderr.text.count("\n") == 15
+    assert "Files: 10/30 succeeded · 0 failed · 19 active · 1 waiting" in stderr.text
+    assert "showing 14/19 active" in stderr.text
+    assert "file-01.pdf" not in stderr.text   # completed row hidden live
+    assert "file-11.pdf" in stderr.text       # active row shown live
+    assert "file-25.pdf" not in stderr.text   # excess active row summarised
+    assert "file-30.pdf" not in stderr.text   # pending row summarised
+
+
+def test_large_progress_prints_every_final_row_once_without_large_rewind(monkeypatch):
+    """The final full report scrolls once and is never used as a live frame."""
+    stderr = _RecordingTty()
+    monkeypatch.setattr(_client_mod.sys, "stderr", stderr)
+    monkeypatch.setattr(
+        _client_mod.shutil, "get_terminal_size",
+        lambda fallback: os.terminal_size((219, 17)),
+    )
+    jobs = {
+        f"file-{i:02d}.pdf": JobEntry(status=STATUS_PROCESSING)
+        for i in range(1, 31)
+    }
+    manifest = Manifest(jobs=jobs)
+    renderer = _client_mod._PerFileProgress(started_at=0.0)
+    renderer.update(manifest)
+
+    before_final = len(stderr.text)
+    for entry in jobs.values():
+        entry.status = STATUS_COMPLETED
+        entry.downloaded = True
+    renderer.update(manifest)
+    final_output = stderr.text[before_final:]
+
+    for i in range(1, 31):
+        assert f"file-{i:02d}.pdf" in final_output
+    cursor_rewinds = [int(n) for n in re.findall(r"\x1b\[(\d+)A", stderr.text)]
+    assert cursor_rewinds
+    assert max(cursor_rewinds) <= 15
+
+    after_final = stderr.text
+    renderer.update(manifest)
+    assert stderr.text == after_final
+
+
+def test_progress_uses_manifest_timestamps_after_resume(monkeypatch):
+    """A resumed final row reports persisted duration, not a fresh 0:00."""
+    stderr = _RecordingTty()
+    monkeypatch.setattr(_client_mod.sys, "stderr", stderr)
+    renderer = _client_mod._PerFileProgress(started_at=0.0)
+    manifest = Manifest(jobs={
+        "resumed.pdf": JobEntry(
+            status=STATUS_COMPLETED,
+            downloaded=True,
+            submitted_at="2026-07-19T10:00:00+00:00",
+            completed_at="2026-07-19T10:01:05+00:00",
+        ),
+    })
+
+    renderer.update(manifest)
+
+    assert "resumed.pdf  ✓ done  [1:05]" in stderr.text
+
+
+def test_final_failure_text_cannot_inject_terminal_controls(monkeypatch):
+    stderr = _RecordingTty()
+    monkeypatch.setattr(_client_mod.sys, "stderr", stderr)
+    manifest = Manifest(jobs={
+        "failed.pdf": JobEntry(
+            status=STATUS_FAILED,
+            error="server error\n\x1b[2Jbad",
+        ),
+    })
+
+    _client_mod._PerFileProgress(started_at=0.0).update(manifest)
+
+    assert "server error??[2Jbad" in stderr.text
+    assert "\x1b[2J" not in stderr.text
 
 
 class _RecordingTty(_FakeTty):
