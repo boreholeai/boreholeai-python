@@ -191,6 +191,23 @@ def load_or_init(
     return manifest
 
 
+def load(output_dir: Path) -> Optional[Manifest]:
+    """Read the manifest in `output_dir`, or None if there isn't one.
+
+    Read-only companion to `load_or_init` for pre-flight peeks (e.g. the
+    retry-failed-pages offer in client.py): never creates or mutates
+    state. A corrupt or wrong-version manifest also returns None here —
+    `load_or_init` is where that raises with the real error message.
+    """
+    path = Path(output_dir).resolve() / MANIFEST_FILENAME
+    if not path.exists():
+        return None
+    try:
+        return _read(path)
+    except Exception:
+        return None
+
+
 def save(manifest: Manifest, output_dir: Path) -> None:
     """Write manifest atomically (tmp file + rename) so Ctrl-C never leaves
     a half-written JSON."""
@@ -277,6 +294,10 @@ def _to_dict(m: Manifest) -> dict:
             "REDO ONE FILE: set jobs.<filename>.reprocess to true. It is "
             "re-processed (and re-charged) on the next run; the flag clears "
             "itself. Do not edit 'status' - it mirrors the server's record.",
+            "PAGES FAILED INSIDE A COMPLETED FILE (a 'warning' below): no "
+            "edit needed - the next interactive run offers to re-process "
+            "those files (or pass retry_failed_pages=True). Saying yes "
+            "re-charges them like new files.",
             "FIXED A BAD SCAN: just save the corrected file over the old one in "
             "the input folder. The size/date fingerprint detects the change and "
             "re-processes it automatically - no manifest edit needed.",
