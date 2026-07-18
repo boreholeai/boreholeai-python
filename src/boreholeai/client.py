@@ -14,6 +14,7 @@ import httpx
 from boreholeai._api import APIClientAsync, DEFAULT_BASE_URL, DEFAULT_TIMEOUT
 from boreholeai._batch import (
     _DEFAULT_CONCURRENCY,
+    _job_workdir,
     BatchResult,
     resolve_effective_concurrency,
     run_batch,
@@ -185,14 +186,14 @@ class BoreholeAI:
     ) -> JobResult:
         """Merge successful jobs, log summary, build JobResult."""
         success_dirs = [
-            batch.workdir / batch.job_ids[name]
+            _job_workdir(batch.workdir, name, batch.job_ids[name])
             for name in batch.successes
             if name in batch.job_ids and batch.workdir is not None
         ]
         # Map each per-job dir back to its original input filename so any
         # merge warning shows the user-facing name, not the job UUID.
         dir_labels = {
-            batch.workdir / batch.job_ids[name]: name
+            _job_workdir(batch.workdir, name, batch.job_ids[name]): name
             for name in batch.successes
             if name in batch.job_ids and batch.workdir is not None
         }
@@ -412,15 +413,19 @@ class _PerFileProgress:
             sys.stderr.write(f"\033[{self._lines_drawn}A")
 
         max_name_len = min(40, max((len(n) for n in self._order), default=10))
+        index_width = len(str(len(self._order)))
         rendered = 0
-        for name in self._order:
+        for index, name in enumerate(self._order, start=1):
             entry = manifest.jobs.get(name)
             if entry is None:
                 continue
             end_time = self._file_ended.get(name, now)
             elapsed = end_time - self._file_started.get(name, now)
             elapsed_in_sg = self._elapsed_in_current_sg(name, entry, now)
-            line = self._format_line(name, entry, max_name_len, elapsed, elapsed_in_sg)
+            line = self._format_line(
+                index, name, entry, index_width, max_name_len,
+                elapsed, elapsed_in_sg,
+            )
             sys.stderr.write(f"\r\033[K        {line}\n")
             rendered += 1
 
@@ -448,7 +453,8 @@ class _PerFileProgress:
         self._lines_drawn = 0
 
     def _format_line(
-        self, name: str, entry, name_width: int,
+        self, index: int, name: str, entry,
+        index_width: int, name_width: int,
         elapsed: float, elapsed_in_sg: float,
     ) -> str:
         # Sanitise FIRST — defends against ANSI / OSC injection via
@@ -459,10 +465,12 @@ class _PerFileProgress:
         padded = truncated.ljust(name_width)
         time_str = _fmt_progress(elapsed) if entry.status != STATUS_PENDING else "—"
         body = self._status_body(entry, elapsed_in_sg)
-        return f"{padded}  {body}  [{time_str}]"
+        return f"{index:>{index_width}}. {padded}  {body}  [{time_str}]"
 
     def _status_body(self, entry, elapsed_in_sg: float) -> str:
         s = entry.status
+        if s == STATUS_COMPLETED and entry.reprocess:
+            return "queued for reprocessing"
         if s == STATUS_PENDING:
             # With cap-aware pacing, files in the PENDING state are held by
             # the SDK's submit semaphore — waiting for a server-side slot to
@@ -523,6 +531,8 @@ def _file_is_terminal(entry) -> bool:
     renderer would latch its final frame the moment the last file's
     poll ends, swallowing the `downloading… → ✓ done` transition.
     """
+    if entry.status == STATUS_COMPLETED and entry.reprocess:
+        return False
     if entry.status in (STATUS_FAILED, STATUS_SUBMIT_FAILED):
         return True
     return entry.status == STATUS_COMPLETED and entry.downloaded

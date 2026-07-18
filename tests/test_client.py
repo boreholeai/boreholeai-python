@@ -13,6 +13,7 @@ import pytest
 from boreholeai import BoreholeAI
 from boreholeai import _batch
 from boreholeai import client as _client_mod
+from boreholeai._manifest import JobEntry, Manifest, STATUS_COMPLETED
 from tests.test_batch import FakeServer  # reuse the fake server
 
 
@@ -212,6 +213,67 @@ class _FakeTty:
 
     def flush(self) -> None:
         pass
+
+
+def test_per_file_progress_shows_one_based_index(monkeypatch):
+    """Every progress row identifies its input position, starting from one."""
+    stderr = _RecordingTty()
+    monkeypatch.setattr(_client_mod.sys, "stderr", stderr)
+    renderer = _client_mod._PerFileProgress(started_at=0.0)
+    manifest = Manifest(jobs={
+        "ARU-K-AH21.pdf": JobEntry(
+            status=STATUS_COMPLETED,
+            downloaded=True,
+            job_id="job-21-uuid",
+        ),
+        "ARU-K-AH22.pdf": JobEntry(
+            status=STATUS_COMPLETED,
+            downloaded=True,
+            job_id="job-22-uuid",
+        ),
+    })
+
+    renderer.update(manifest)
+
+    assert "1. ARU-K-AH21.pdf  ✓ done" in stderr.text
+    assert "2. ARU-K-AH22.pdf  ✓ done" in stderr.text
+    assert "job_id" not in stderr.text
+
+
+def test_reprocess_progress_waits_for_new_job_frame(monkeypatch):
+    """A completed entry marked for redo must not latch the old final frame."""
+    stderr = _RecordingTty()
+    monkeypatch.setattr(_client_mod.sys, "stderr", stderr)
+    renderer = _client_mod._PerFileProgress(started_at=0.0)
+    entry = JobEntry(
+        status=STATUS_COMPLETED,
+        downloaded=True,
+        reprocess=True,
+        job_id="old-job",
+    )
+    manifest = Manifest(jobs={"ARU-K-AH21.pdf": entry})
+
+    renderer.update(manifest)
+    entry.reprocess = False
+    entry.job_id = "new-job"
+    renderer.update(manifest)
+
+    assert "ARU-K-AH21.pdf  queued for reprocessing" in stderr.text
+    assert "ARU-K-AH21.pdf  ✓ done" in stderr.text
+
+
+class _RecordingTty(_FakeTty):
+    def __init__(self):
+        super().__init__(tty=True)
+        self.parts: list[str] = []
+
+    @property
+    def text(self) -> str:
+        return "".join(self.parts)
+
+    def write(self, s: str) -> int:
+        self.parts.append(s)
+        return len(s)
 
 
 def test_partial_failure_keeps_manifest_for_resume(tmp_path, fast_polls):
