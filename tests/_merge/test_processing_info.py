@@ -200,3 +200,22 @@ def test_merge_json_aggregates_processing_info_like_excel(tmp_path):
     assert info["Material Records"] == "10"
     # Record sections still concatenated.
     assert len(out["ground_profile"]["material"]) == 2
+
+
+def test_merge_json_drops_page_from_test_data_only(tmp_path):
+    """The per-source-file "page" field is dropped from merged test_data
+    records but kept on ground_profile records."""
+    import json
+
+    from boreholeai._merge._json import merge_json_files
+
+    doc = {
+        "ground_profile": {"material": [{"Hole_ID": "BH01", "page": 2}]},
+        "test_data": {"SPT": [{"depth_top": 1.0, "SPT_N": 10, "page": 2}]},
+    }
+    a = tmp_path / "a.json"
+    a.write_text(json.dumps(doc))
+
+    out = json.loads(merge_json_files([a]))
+    assert out["test_data"]["SPT"] == [{"depth_top": 1.0, "SPT_N": 10}]
+    assert out["ground_profile"]["material"] == [{"Hole_ID": "BH01", "page": 2}]

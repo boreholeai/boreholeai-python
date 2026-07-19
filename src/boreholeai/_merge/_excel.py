@@ -53,13 +53,17 @@ _WRAP_TEXT_COLS = frozenset({
 })
 
 
-def merge_excel_files(paths: Iterable[Path]) -> bytes:
+def merge_excel_files(
+    paths: Iterable[Path], drop_columns: frozenset[str] = frozenset(),
+) -> bytes:
     """Merge multiple Excel files into one workbook, returned as bytes.
 
     Sheet rules:
       • "Processing Info" is aggregated via `build_merged_processing_info`.
       • Every other sheet is merged by name: first file's sheet copied
         whole (incl. header); subsequent files' rows appended (skip header).
+      • Columns whose header is in `drop_columns` are omitted (matched per
+        source sheet, so per-file column positions may differ).
       • Styles are applied to every sheet at the end.
     """
     paths = list(paths)
@@ -92,15 +96,21 @@ def merge_excel_files(paths: Iterable[Path]) -> bytes:
                 if name == "Processing Info":
                     continue
                 src = wb[name]
+                rows = [list(row) for row in src.iter_rows(values_only=True)]
+                if drop_columns and rows:
+                    keep = [
+                        i for i, h in enumerate(rows[0]) if h not in drop_columns
+                    ]
+                    if len(keep) != len(rows[0]):
+                        rows = [[r[i] for i in keep] for r in rows]
                 if name not in merged.sheetnames:
                     dest = merged.create_sheet(name)
-                    for row in src.iter_rows(values_only=True):
-                        dest.append(list(row))
+                    for row in rows:
+                        dest.append(row)
                 else:
                     dest = merged[name]
-                    rows = list(src.iter_rows(values_only=True))
                     for row in rows[1:]:
-                        dest.append(list(row))
+                        dest.append(row)
         finally:
             wb.close()
 
