@@ -220,7 +220,13 @@ class BoreholeAI:
         ) as client:
             # Pace ourselves to the server's per-user cap so we never
             # send POSTs that would just be 429-rejected.
-            effective, _ = await resolve_effective_concurrency(client, concurrency)
+            effective, server_cap = await resolve_effective_concurrency(client, concurrency)
+            if server_cap is None:
+                _log(
+                    f"🟡 Could not confirm the server's concurrency cap — "
+                    f"using workers={effective}; if your account cap is lower, "
+                    f"the server will throttle extra submissions (429 + retry)"
+                )
             _log(f"🟢 Starting {len(files)} file(s) (workers={effective})")
             return await run_batch(
                 client, files, output_dir, concurrency=effective,
