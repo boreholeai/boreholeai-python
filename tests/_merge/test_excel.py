@@ -38,6 +38,31 @@ def test_merge_appends_rows_skipping_header(tmp_path):
     assert data == ["BH1", "BH2", "BH3"]
 
 
+def test_drop_columns_removes_page_from_every_sheet(tmp_path):
+    a = _write_book(tmp_path, "a.xlsx", {
+        "SPT": [["depth_top", "SPT_N", "page"], [1.0, 10, 1]],
+    })
+    b = _write_book(tmp_path, "b.xlsx", {
+        "SPT": [["depth_top", "SPT_N", "page"], [2.0, 20, 3]],
+    })
+
+    out = io.BytesIO(merge_excel_files([a, b], drop_columns=frozenset({"page"})))
+    wb = load_workbook(out, data_only=True)
+    rows = list(wb["SPT"].iter_rows(values_only=True))
+    assert rows[0] == ("depth_top", "SPT_N")
+    assert sorted(r for r in rows[1:]) == [(1.0, 10), (2.0, 20)]
+
+
+def test_drop_columns_defaults_to_keeping_everything(tmp_path):
+    a = _write_book(tmp_path, "a.xlsx", {
+        "SPT": [["depth_top", "page"], [1.0, 1]],
+    })
+
+    out = io.BytesIO(merge_excel_files([a]))
+    wb = load_workbook(out, data_only=True)
+    assert list(wb["SPT"].iter_rows(values_only=True))[0] == ("depth_top", "page")
+
+
 def test_processing_info_aggregated(tmp_path):
     a = _write_book(tmp_path, "a.xlsx", {
         "Processing Info": [["Metric", "Value"], ["Total Boreholes", "1"]],

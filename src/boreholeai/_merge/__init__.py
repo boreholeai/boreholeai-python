@@ -131,7 +131,9 @@ def merge_results(
 
     if test_data_paths:
         out = output_dir / "Borehole_test_data_merged.xlsx"
-        out.write_bytes(merge_excel_files(test_data_paths))
+        # "page" is per-source-file metadata (1-based page within THAT pdf);
+        # in a cross-file merge it is ambiguous, so the merged output drops it.
+        out.write_bytes(merge_excel_files(test_data_paths, drop_columns=frozenset({"page"})))
         result.files.append(out)
         logger.info(
             "merged test_data from %d file(s) → %s",

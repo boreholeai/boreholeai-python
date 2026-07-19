@@ -25,6 +25,12 @@ logger = logging.getLogger(__name__)
 # JSON section key whose rows are an aggregated summary, not appendable records.
 _PROCESSING_INFO_KEY = "processing_info"
 
+# "page" is per-source-file metadata (1-based page within THAT pdf); in a
+# cross-file merge it is ambiguous, so test_data records drop it — mirrors
+# the Excel merge dropping the "page" column from Borehole_test_data_merged.
+_TEST_DATA_GROUP = "test_data"
+_DROPPED_TEST_DATA_FIELD = "page"
+
 
 def merge_json_files(paths: Iterable[Path]) -> str:
     """Merge Borehole_data.json files into one JSON string (indent=2).
@@ -60,6 +66,12 @@ def merge_json_files(paths: Iterable[Path]) -> str:
                 if key == _PROCESSING_INFO_KEY:
                     pi_infos.setdefault(group, []).append(_records_to_info(rows))
                 else:
+                    if group == _TEST_DATA_GROUP:
+                        rows = [
+                            {k: v for k, v in r.items() if k != _DROPPED_TEST_DATA_FIELD}
+                            if isinstance(r, dict) else r
+                            for r in rows
+                        ]
                     dest.setdefault(key, []).extend(rows)
 
     # Aggregate processing_info per group, mirroring the Excel merge. The
