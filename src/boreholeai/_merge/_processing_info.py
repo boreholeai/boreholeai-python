@@ -49,17 +49,22 @@ def read_processing_info(sheet: Worksheet) -> dict[str, str]:
     return info
 
 
-def build_merged_processing_info(
-    infos: list[dict[str, str]], dest_sheet: Worksheet,
-) -> None:
-    """Aggregate Processing Info across files and write to `dest_sheet`."""
+def aggregate_processing_info(infos: list[dict[str, str]]) -> list[tuple[str, str]]:
+    """Aggregate Processing Info across files into (metric, value) rows.
+
+    Shared by the Excel merge (which writes the rows to a worksheet) and the
+    JSON merge (which converts them to records), so both outputs stay identical.
+    """
     total_boreholes = 0
     boreholes_done = 0
     boreholes_failed = 0
     total_pages = 0
     pages_skipped = 0
     total_time_sec = 0.0
-    failed_list: list[str] = []
+    # name -> list of reason strings (insertion-ordered, deduped). A borehole
+    # may recur across source files; its reasons are combined. Older workbooks
+    # carry a blank reason, which contributes nothing.
+    failed_reasons: dict[str, list[str]] = {}
     record_counts: dict[str, int] = {}
 
     for info in infos:
@@ -70,9 +75,12 @@ def build_merged_processing_info(
         pages_skipped += _parse_num(info.get("Pages Skipped (Non-borehole)"))
         total_time_sec += _parse_duration(info.get("Total Processing Time"))
 
-        for metric in info:
+        for metric, value in info.items():
             if metric.startswith("  ") and metric.strip() not in _SUMMARY_METRICS:
-                failed_list.append(metric.strip())
+                name = metric.strip()
+                reasons = failed_reasons.setdefault(name, [])
+                if value and value not in reasons:
+                    reasons.append(value)
 
         for metric, value in info.items():
             trimmed = metric.strip()
@@ -98,12 +106,12 @@ def build_merged_processing_info(
         ("Boreholes Failed", str(boreholes_failed)),
     ]
 
-    if failed_list:
+    if failed_reasons:
         rows.append(("", ""))
         rows.append(("— Failed Boreholes —", ""))
         rows.append(("", ""))
-        for name in failed_list:
-            rows.append((f"  {name}", ""))
+        for name, reasons in failed_reasons.items():
+            rows.append((f"  {name}", "; ".join(reasons)))
         rows.append(("", ""))
 
     rows.extend([
@@ -118,7 +126,14 @@ def build_merged_processing_info(
     for metric, count in record_counts.items():
         rows.append((metric, str(count)))
 
-    for metric, value in rows:
+    return rows
+
+
+def build_merged_processing_info(
+    infos: list[dict[str, str]], dest_sheet: Worksheet,
+) -> None:
+    """Aggregate Processing Info across files and write to `dest_sheet`."""
+    for metric, value in aggregate_processing_info(infos):
         dest_sheet.append([metric, value])
 
     dest_sheet.column_dimensions["A"].width = 35
