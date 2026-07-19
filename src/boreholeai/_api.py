@@ -6,6 +6,8 @@ import asyncio
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
+from urllib.request import url2pathname
 
 import httpx
 
@@ -45,6 +47,7 @@ class APIClientAsync:
         base_url: str,
         timeout: float,
         *,
+        local_data: bool = False,
         _transport: httpx.AsyncBaseTransport | None = None,
     ):
         self._auth_headers: dict[str, str] = {"Authorization": f"Bearer {api_key}"}
@@ -57,6 +60,12 @@ class APIClientAsync:
         self._api_client: httpx.AsyncClient | None = None
         self._dl_client: httpx.AsyncClient | None = None
         self.server_tag: str = ""
+        # Batch-scoped local-data-plane flag: every job this client creates
+        # asks the server to keep bytes on its own disk (data_plane=local)
+        # and results come back as file:// URLs. Set only by
+        # process_documents(local_data=True), which has already verified the
+        # base_url points at this machine.
+        self.local_data = local_data
 
     async def _connect(self) -> httpx.AsyncClient:
         """Try each URL in order until one responds."""
@@ -108,7 +117,8 @@ class APIClientAsync:
             ("files", (p.name, content))
             for p, content in zip(file_paths, contents)
         ]
-        resp = await client.post("/v1/jobs", files=files)
+        data = {"data_plane": "local"} if self.local_data else None
+        resp = await client.post("/v1/jobs", files=files, data=data)
         _raise_for_status(resp)
         return _json_body(resp)
 
@@ -138,9 +148,22 @@ class APIClientAsync:
     async def download_file(self, url: str) -> bytes:
         """Download a signed URL.
 
-        Uses a separate httpx.AsyncClient (no auth headers, no base URL) since
-        signed URLs go to Supabase Storage, not the API host.
+        Local-data-plane jobs return file:// URLs — those are read straight
+        from disk (the server wrote them on this same machine). Everything
+        else uses a separate httpx.AsyncClient (no auth headers, no base URL)
+        since signed URLs go to Supabase Storage, not the API host.
         """
+        if url.startswith("file://"):
+            path = Path(url2pathname(urlsplit(url).path))
+            try:
+                return await asyncio.to_thread(path.read_bytes)
+            except FileNotFoundError:
+                raise BoreholeAIError(
+                    f"Local-mode result file not found: {path}. Jobs created "
+                    f"with local_data=True can only be downloaded on the "
+                    f"machine that runs the server.",
+                    404,
+                )
         if self._dl_client is None:
             self._dl_client = httpx.AsyncClient(
                 timeout=self._timeout, transport=self._transport,

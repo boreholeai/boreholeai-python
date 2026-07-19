@@ -9,6 +9,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -130,6 +131,7 @@ class BoreholeAI:
         output_dir: str | Path = _DEFAULT_OUTPUT_DIR,
         finalise_and_cleanup: Optional[bool] = None,
         retry_failed_pages: Optional[bool] = None,
+        local_data: bool = False,
     ) -> JobResult:
         """Submit, process, and merge a single file or a folder of files.
 
@@ -160,6 +162,12 @@ class BoreholeAI:
                 ask once before the run starts. Any non-answer (Enter, EOF,
                 Ctrl-C) leaves them completed; under cron/CI/pipes nothing
                 is asked and nothing is re-charged.
+            local_data: Keep file bytes on the server machine's own disk
+                instead of cloud storage (the "local data plane"). Only for
+                runs where the SDK and the processing server are on the SAME
+                machine — requires a localhost base_url, and raises
+                ValueError otherwise. Job records, credits, and concurrency
+                accounting are unaffected.
 
         Returns:
             JobResult — `status` is "completed", "partial", or "failed";
@@ -169,6 +177,13 @@ class BoreholeAI:
             FileNotFoundError, ValueError on bad input. Otherwise per-file
             failures are reported via `result.failures`, not raised.
         """
+        if local_data and not _is_loopback_base_url(self._base_url):
+            raise ValueError(
+                f"local_data=True requires a localhost base_url (the SDK and "
+                f"server must be on the same machine), got {self._base_url!r}. "
+                f"Pass base_url='http://localhost:<port>' or drop local_data."
+            )
+
         files = collect_files(input_path)
         out = Path(output_dir).resolve()
         out.mkdir(parents=True, exist_ok=True)
@@ -181,7 +196,9 @@ class BoreholeAI:
 
         renderer = _PerFileProgress(start) if sys.stderr.isatty() else None
         try:
-            batch = asyncio.run(self._run(files, out, _DEFAULT_CONCURRENCY, renderer))
+            batch = asyncio.run(
+                self._run(files, out, _DEFAULT_CONCURRENCY, renderer, local_data)
+            )
         finally:
             if renderer is not None:
                 renderer.finalise()
@@ -192,11 +209,13 @@ class BoreholeAI:
     async def _run(
         self, files: list[Path], output_dir: Path, concurrency: int,
         renderer: Optional["_PerFileProgress"] = None,
+        local_data: bool = False,
     ) -> BatchResult:
         async with APIClientAsync(
             api_key=self._api_key,
             base_url=self._base_url,
             timeout=self._timeout,
+            local_data=local_data,
             _transport=self._transport,
         ) as client:
             # Pace ourselves to the server's per-user cap so we never
@@ -330,6 +349,16 @@ class BoreholeAI:
 # -------------------------------------------
 # Internal Helper Functions
 # -------------------------------------------
+
+def _is_loopback_base_url(base_url: str) -> bool:
+    """True iff `base_url` points at this machine (localhost/127.0.0.1/::1).
+
+    Guard for local_data=True: the server writes result files to its own
+    disk and returns file:// URLs, which only resolve on the server machine.
+    """
+    host = urlsplit(base_url).hostname or ""
+    return host in ("localhost", "127.0.0.1", "::1")
+
 
 def _log(message: str) -> None:
     """Print a status line to stderr."""
