@@ -488,6 +488,43 @@ def test_empty_api_key_rejected():
         BoreholeAI(api_key="")
 
 
+# --- local_data (local data plane: bytes stay on the server machine) ---
+
+def test_local_data_rejects_public_base_url(tmp_path):
+    indir = _input_dir(tmp_path, ["a.pdf"])
+    client = BoreholeAI(api_key="bhai_test", base_url="https://api1.boreholeai.com")
+
+    with pytest.raises(ValueError, match="local_data=True requires a localhost base_url"):
+        client.process_documents(indir, output_dir=tmp_path / "out", local_data=True)
+
+
+def test_local_data_accepted_with_localhost_base_url(tmp_path, fast_polls):
+    server = FakeServerWithAgs(complete_after_polls=1)
+    indir = _input_dir(tmp_path, ["a.pdf"])
+
+    client = BoreholeAI(api_key="bhai_test", base_url="http://localhost:8001",
+                         _transport=server.transport())
+    result = client.process_documents(
+        indir, output_dir=tmp_path / "out", local_data=True,
+    )
+
+    assert result.status == "completed"
+    # The flag is recorded per job in the manifest (kept when cleanup is off)
+    m = _client_mod._manifest.load(tmp_path / "out")
+    assert m.jobs["a.pdf"].local_data is True
+
+
+@pytest.mark.parametrize("base_url,expected", [
+    ("http://localhost:8001", True),
+    ("http://127.0.0.1:8000", True),
+    ("http://[::1]:8000", True),
+    ("https://api1.boreholeai.com", False),
+    ("https://localhost.evil.com", False),
+])
+def test_is_loopback_base_url(base_url, expected):
+    assert _client_mod._is_loopback_base_url(base_url) is expected
+
+
 # --- retry_failed_pages (pre-flight flagging of completed files with failed pages) ---
 
 def _seed_warned_manifest(out: Path) -> None:
