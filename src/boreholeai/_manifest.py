@@ -62,6 +62,10 @@ class JobEntry:
     num_pages: Optional[int] = None
     pages_done: int = 0                 # legacy; kept for back-compat manifests
     purged: bool = False                # only meaningful if API key has purge_on_download
+    # True when the job was submitted with data_plane=local: its bytes live on
+    # the server machine's disk and results arrive as file:// URLs, so this
+    # entry can only be resumed/downloaded from that same machine.
+    local_data: bool = False
     submitted_at: Optional[str] = None
     completed_at: Optional[str] = None
     # Live-progress fields, populated from poll responses' `progress` JSONB.

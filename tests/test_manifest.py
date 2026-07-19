@@ -279,6 +279,23 @@ def test_load_ignores_unknown_fields_in_entry(tmp_path):
     assert m.jobs["a.pdf"].status == STATUS_COMPLETED
 
 
+def test_local_data_round_trips_and_legacy_defaults_false(tmp_path):
+    out = tmp_path / "out"
+    out.mkdir()
+    payload = {
+        "version": MANIFEST_VERSION,
+        "jobs": {
+            "local.pdf": {"job_id": "u1", "status": "completed", "local_data": True},
+            "legacy.pdf": {"job_id": "u2", "status": "completed"},  # pre-0.8.0 manifest
+        },
+    }
+    (out / MANIFEST_FILENAME).write_text(json.dumps(payload))
+
+    m = load_or_init(out, input_root=tmp_path, concurrency=6, files=[])
+    assert m.jobs["local.pdf"].local_data is True
+    assert m.jobs["legacy.pdf"].local_data is False
+
+
 # --- load (read-only peek) ---
 
 def test_load_returns_none_when_missing(tmp_path):

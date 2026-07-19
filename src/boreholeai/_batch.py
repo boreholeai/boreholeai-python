@@ -351,6 +351,7 @@ async def _submit_one(
                 e.num_pages = data.get("num_pages")
                 e.status = STATUS_SUBMITTED
                 e.submitted_at = _manifest._now()
+                e.local_data = client.local_data
                 e.error = None
                 # A (re)submitted entry is a new server job — any download
                 # state from a previous job_id no longer applies, and a
