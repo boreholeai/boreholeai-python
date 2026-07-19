@@ -91,6 +91,54 @@ def test_build_merged_collects_failed_boreholes():
     assert "  BH99" in metrics
 
 
+def test_build_merged_carries_failure_reason():
+    """A failed borehole's reason (column B) is preserved in the merged sheet."""
+    reason = "Page 3: Could not read the borehole log on this page"
+    info = {"Total Boreholes": "2", "Boreholes Failed": "1", "  BH01": reason}
+
+    wb = Workbook(); dest = wb.active
+    build_merged_processing_info([info], dest)
+
+    rows = {r[0]: r[1] for r in dest.iter_rows(values_only=True) if r[0]}
+    assert rows["  BH01"] == reason
+
+
+def test_build_merged_combines_duplicate_failure_reasons():
+    """Same borehole across two files: reasons are combined with '; '."""
+    info_a = {"Boreholes Failed": "1", "  BH01": "Page 1: reason A"}
+    info_b = {"Boreholes Failed": "1", "  BH01": "Page 2: reason B"}
+
+    wb = Workbook(); dest = wb.active
+    build_merged_processing_info([info_a, info_b], dest)
+
+    rows = {r[0]: r[1] for r in dest.iter_rows(values_only=True) if r[0]}
+    assert rows["  BH01"] == "Page 1: reason A; Page 2: reason B"
+
+
+def test_build_merged_dedups_identical_failure_reason():
+    """Identical reason for the same borehole is not repeated."""
+    reason = "Page 1: reason A"
+    info_a = {"  BH01": reason}
+    info_b = {"  BH01": reason}
+
+    wb = Workbook(); dest = wb.active
+    build_merged_processing_info([info_a, info_b], dest)
+
+    rows = {r[0]: r[1] for r in dest.iter_rows(values_only=True) if r[0]}
+    assert rows["  BH01"] == reason
+
+
+def test_build_merged_failed_borehole_blank_reason_compat():
+    """Older workbooks store a blank reason — the merged cell stays blank."""
+    info = {"Boreholes Failed": "1", "  BH99": ""}
+
+    wb = Workbook(); dest = wb.active
+    build_merged_processing_info([info], dest)
+
+    rows = {r[0]: r[1] for r in dest.iter_rows(values_only=True) if r[0]}
+    assert rows["  BH99"] in ("", None)
+
+
 def test_build_merged_handles_zero_pages():
     """Avg Time per Page must be 'N/A' when pages == 0 (no division by zero)."""
     info = {"Total Boreholes": "0", "Total Pages Processed": "0",
@@ -101,3 +149,54 @@ def test_build_merged_handles_zero_pages():
 
     rows = {r[0]: r[1] for r in dest.iter_rows(values_only=True) if r[0]}
     assert rows["Average Time per Page"] == "N/A"
+
+
+def _make_json_doc(total, failed, name, reason):
+    return {
+        "ground_profile": {
+            "processing_info": [
+                {"Metric": "— Processing Summary —", "Value": ""},
+                {"Metric": "Total Boreholes", "Value": str(total)},
+                {"Metric": "Boreholes Digitalised", "Value": str(total - failed)},
+                {"Metric": "Boreholes Failed", "Value": str(failed)},
+                {"Metric": "— Failed Boreholes —", "Value": ""},
+                {"Metric": f"  {name}", "Value": reason},
+                {"Metric": "— Record Counts —", "Value": ""},
+                {"Metric": "Material Records", "Value": "5"},
+            ],
+            "material": [{"Hole_ID": name, "x": 1}],
+        }
+    }
+
+
+def test_merge_json_aggregates_processing_info_like_excel(tmp_path):
+    """JSON merge aggregates processing_info (dedup summary, combine reasons,
+    sum counts) instead of naively concatenating, and drops the worksheet
+    header. Record sections are still concatenated."""
+    import json
+
+    from boreholeai._merge._json import merge_json_files
+
+    a = tmp_path / "a.json"
+    a.write_text(json.dumps(_make_json_doc(3, 1, "BH01", "Page 1: reason A")))
+    b = tmp_path / "b.json"
+    b.write_text(json.dumps(_make_json_doc(2, 1, "BH02", "Page 2: reason B")))
+
+    out = json.loads(merge_json_files([a, b]))
+    pi = out["ground_profile"]["processing_info"]
+
+    # No worksheet header leaked into the JSON records.
+    assert not any(r["Metric"] == "Metric" and r["Value"] == "Value" for r in pi)
+
+    info = {r["Metric"].strip(): r["Value"] for r in pi if r["Metric"].strip()}
+    # Summary aggregated once, not duplicated.
+    assert sum(1 for r in pi if r["Metric"] == "Total Boreholes") == 1
+    assert info["Total Boreholes"] == "5"
+    assert info["Boreholes Failed"] == "2"
+    # Both failure reasons carried.
+    assert info["BH01"] == "Page 1: reason A"
+    assert info["BH02"] == "Page 2: reason B"
+    # Record counts summed.
+    assert info["Material Records"] == "10"
+    # Record sections still concatenated.
+    assert len(out["ground_profile"]["material"]) == 2
