@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from ._processing_info import aggregate_processing_info
 
@@ -32,7 +32,10 @@ _TEST_DATA_GROUP = "test_data"
 _DROPPED_TEST_DATA_FIELD = "page"
 
 
-def merge_json_files(paths: Iterable[Path]) -> str:
+def merge_json_files(
+    paths: Iterable[Path],
+    source_files: Mapping[Path, str] | None = None,
+) -> str:
     """Merge Borehole_data.json files into one JSON string (indent=2).
 
     An unparseable per-job file is skipped (logged) so the merge still
@@ -41,11 +44,16 @@ def merge_json_files(paths: Iterable[Path]) -> str:
     mergers, which degrade rather than abort the whole batch.
     """
     merged: dict[str, dict[str, list[object]]] = {}
+    resolved_source_files = {
+        Path(path).resolve(): stem
+        for path, stem in (source_files or {}).items()
+    }
     # group -> list of per-file metric→value dicts. processing_info is a summary,
     # so it is aggregated the same clean way as the Excel merge after all files
     # are read — not naively concatenated like the record sections.
     pi_infos: dict[str, list[dict[str, str]]] = {}
     for path in paths:
+        source_file = resolved_source_files.get(Path(path).resolve())
         try:
             doc = json.loads(Path(path).read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
@@ -66,12 +74,20 @@ def merge_json_files(paths: Iterable[Path]) -> str:
                 if key == _PROCESSING_INFO_KEY:
                     pi_infos.setdefault(group, []).append(_records_to_info(rows))
                 else:
-                    if group == _TEST_DATA_GROUP:
-                        rows = [
-                            {k: v for k, v in r.items() if k != _DROPPED_TEST_DATA_FIELD}
-                            if isinstance(r, dict) else r
-                            for r in rows
-                        ]
+                    rows = [
+                        _with_source_file(
+                            {
+                                k: v for k, v in record.items()
+                                if not (
+                                    group == _TEST_DATA_GROUP
+                                    and k == _DROPPED_TEST_DATA_FIELD
+                                )
+                            },
+                            source_file,
+                        )
+                        if isinstance(record, dict) else record
+                        for record in rows
+                    ]
                     dest.setdefault(key, []).extend(rows)
 
     # Aggregate processing_info per group, mirroring the Excel merge. The
@@ -92,6 +108,25 @@ def merge_json_files(paths: Iterable[Path]) -> str:
 # -------------------------------------------
 # Internal Helper Functions
 # -------------------------------------------
+
+def _with_source_file(
+    record: dict[str, object],
+    source_file: str | None,
+) -> dict[str, object]:
+    """Put Source_File first, backfilling legacy records when possible."""
+    existing = record.get("Source_File")
+    value = (
+        source_file
+        if existing is None or str(existing).strip() == ""
+        else existing
+    )
+    if value is None:
+        return record
+    return {
+        "Source_File": value,
+        **{key: item for key, item in record.items() if key != "Source_File"},
+    }
+
 
 def _records_to_info(records: list[object]) -> dict[str, str]:
     """Convert a processing_info record list to a metric→value dict.

@@ -71,9 +71,14 @@ def merge_results(
     def _label(d: Path) -> str:
         return resolved_labels.get(d.resolve(), d.name)
 
+    def _source_file(d: Path) -> str | None:
+        label = resolved_labels.get(d.resolve())
+        return Path(label).stem if label else None
+
     result = MergeResult()
 
     if len(input_dirs) == 1:
+        source_file = _source_file(input_dirs[0])
         for src in _glob_results(input_dirs[0]):
             if src.name.endswith("_annotated.pdf"):
                 dest_dir = output_dir / "annotated_pdf"
@@ -81,7 +86,16 @@ def merge_results(
                 dest = dest_dir / src.name
             else:
                 dest = output_dir / src.name
-            shutil.copy2(src, dest)
+            source_map = {src: source_file} if source_file else None
+            if src.suffix.lower() == ".xlsx" and source_map:
+                dest.write_bytes(merge_excel_files([src], source_files=source_map))
+            elif src.name == "Borehole_data.json" and source_map:
+                dest.write_text(
+                    merge_json_files([src], source_files=source_map),
+                    encoding="utf-8",
+                )
+            else:
+                shutil.copy2(src, dest)
             result.files.append(dest)
         return result
 
@@ -90,6 +104,8 @@ def merge_results(
     ags_paths: list[Path] = []
     json_paths: list[Path] = []
     annotated_pdfs: list[Path] = []
+    excel_source_files: dict[Path, str] = {}
+    json_source_files: dict[Path, str] = {}
 
     for d in input_dirs:
         gp = _find_one(d, "Borehole_ground_profile*.xlsx")
@@ -97,16 +113,21 @@ def merge_results(
         ags = _find_one(d, "Borehole_ags4*.ags")
         js = _find_one(d, "Borehole_data.json")
         label = _label(d)
+        source_file = _source_file(d)
 
         if gp is None:
             result.warnings.append(f"{label}: no ground_profile xlsx found")
         else:
             ground_profile_paths.append(gp)
+            if source_file:
+                excel_source_files[gp] = source_file
 
         if td is None:
             result.warnings.append(f"{label}: no test_data xlsx found")
         else:
             test_data_paths.append(td)
+            if source_file:
+                excel_source_files[td] = source_file
 
         if ags is None:
             result.warnings.append(f"{label}: no AGS file found")
@@ -117,12 +138,17 @@ def merge_results(
             result.warnings.append(f"{label}: no Borehole_data JSON found")
         else:
             json_paths.append(js)
+            if source_file:
+                json_source_files[js] = source_file
 
         annotated_pdfs.extend(sorted(d.glob("*_annotated.pdf")))
 
     if ground_profile_paths:
         out = output_dir / "Borehole_ground_profile_merged.xlsx"
-        out.write_bytes(merge_excel_files(ground_profile_paths))
+        out.write_bytes(merge_excel_files(
+            ground_profile_paths,
+            source_files=excel_source_files,
+        ))
         result.files.append(out)
         logger.info(
             "merged ground_profile from %d file(s) → %s",
@@ -133,7 +159,11 @@ def merge_results(
         out = output_dir / "Borehole_test_data_merged.xlsx"
         # "page" is per-source-file metadata (1-based page within THAT pdf);
         # in a cross-file merge it is ambiguous, so the merged output drops it.
-        out.write_bytes(merge_excel_files(test_data_paths, drop_columns=frozenset({"page"})))
+        out.write_bytes(merge_excel_files(
+            test_data_paths,
+            drop_columns=frozenset({"page"}),
+            source_files=excel_source_files,
+        ))
         result.files.append(out)
         logger.info(
             "merged test_data from %d file(s) → %s",
@@ -151,7 +181,10 @@ def merge_results(
 
     if json_paths:
         out = output_dir / "Borehole_data_merged.json"
-        out.write_text(merge_json_files(json_paths), encoding="utf-8")
+        out.write_text(
+            merge_json_files(json_paths, source_files=json_source_files),
+            encoding="utf-8",
+        )
         result.files.append(out)
         logger.info(
             "merged data JSON from %d file(s) → %s",
