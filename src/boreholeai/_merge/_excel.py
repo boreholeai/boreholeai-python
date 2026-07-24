@@ -9,7 +9,7 @@ from __future__ import annotations
 import io
 import logging
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -41,7 +41,7 @@ _FAILED_HEADER_FONT = Font(bold=True, color="FFCC0000", size=11)
 _FAILED_NAME_FILL = PatternFill(fill_type="solid", fgColor="FFFFFF00")
 
 _LEFT_ALIGN_COLS = frozenset({
-    "Metric", "Value", "material", "material_type", "parent_rock",
+    "Source_File", "Metric", "Value", "material", "material_type", "parent_rock",
     "material_description", "geology_type", "consistency_density_strength",
     "consistency_density", "project_name", "borehole_location",
     "extraction_notes", "grid_datum", "test_results", "other_observations",
@@ -54,14 +54,18 @@ _WRAP_TEXT_COLS = frozenset({
 
 
 def merge_excel_files(
-    paths: Iterable[Path], drop_columns: frozenset[str] = frozenset(),
+    paths: Iterable[Path],
+    drop_columns: frozenset[str] = frozenset(),
+    source_files: Mapping[Path, str] | None = None,
 ) -> bytes:
     """Merge multiple Excel files into one workbook, returned as bytes.
 
     Sheet rules:
       • "Processing Info" is aggregated via `build_merged_processing_info`.
-      • Every other sheet is merged by name: first file's sheet copied
-        whole (incl. header); subsequent files' rows appended (skip header).
+      • Every other sheet is merged by column name, allowing old and new
+        schemas to coexist without shifting values into the wrong columns.
+      • `Source_File` is kept first and backfilled from `source_files` for
+        legacy workbooks that predate that backend field.
       • Columns whose header is in `drop_columns` are omitted (matched per
         source sheet, so per-file column positions may differ).
       • Styles are applied to every sheet at the end.
@@ -69,6 +73,10 @@ def merge_excel_files(
     paths = list(paths)
     if not paths:
         raise ValueError("merge_excel_files requires at least one path")
+    resolved_source_files = {
+        Path(path).resolve(): stem
+        for path, stem in (source_files or {}).items()
+    }
 
     merged = Workbook()
     # Workbook starts with one default sheet — remove it.
@@ -88,31 +96,63 @@ def merge_excel_files(
         dest_pi = merged.create_sheet("Processing Info")
         build_merged_processing_info(processing_infos, dest_pi)
 
-    # Pass 2: merge data sheets.
+    # Pass 2: collect data sheets as header-addressed records. This prevents
+    # positional corruption when old and new workbook schemas are mixed.
+    sheet_headers: dict[str, list[str]] = {}
+    sheet_rows: dict[str, list[dict[str, object]]] = {}
     for p in paths:
+        source_file = resolved_source_files.get(Path(p).resolve())
         wb = load_workbook(p, data_only=True)
         try:
             for name in wb.sheetnames:
                 if name == "Processing Info":
                     continue
                 src = wb[name]
-                rows = [list(row) for row in src.iter_rows(values_only=True)]
-                if drop_columns and rows:
-                    keep = [
-                        i for i, h in enumerate(rows[0]) if h not in drop_columns
-                    ]
-                    if len(keep) != len(rows[0]):
-                        rows = [[r[i] for i in keep] for r in rows]
-                if name not in merged.sheetnames:
-                    dest = merged.create_sheet(name)
-                    for row in rows:
-                        dest.append(row)
-                else:
-                    dest = merged[name]
-                    for row in rows[1:]:
-                        dest.append(row)
+                rows = src.iter_rows(values_only=True)
+                header_row = next(rows, None)
+                if header_row is None:
+                    continue
+
+                indexed_headers = [
+                    (index, str(header))
+                    for index, header in enumerate(header_row)
+                    if header is not None and str(header) not in drop_columns
+                ]
+                dest_headers = sheet_headers.setdefault(name, [])
+                if (
+                    source_file is not None
+                    or any(header == "Source_File" for _, header in indexed_headers)
+                ) and "Source_File" not in dest_headers:
+                    dest_headers.insert(0, "Source_File")
+                for _, header in indexed_headers:
+                    if header not in dest_headers:
+                        dest_headers.append(header)
+
+                dest_rows = sheet_rows.setdefault(name, [])
+                for row in rows:
+                    record = {
+                        header: row[index] if index < len(row) else None
+                        for index, header in indexed_headers
+                    }
+                    existing_source = record.get("Source_File")
+                    if (
+                        source_file is not None
+                        and (existing_source is None or str(existing_source).strip() == "")
+                    ):
+                        record["Source_File"] = source_file
+                    dest_rows.append(record)
         finally:
             wb.close()
+
+    for name, headers in sheet_headers.items():
+        if "Source_File" in headers and headers[0] != "Source_File":
+            headers = ["Source_File"] + [
+                header for header in headers if header != "Source_File"
+            ]
+        dest = merged.create_sheet(name)
+        dest.append(headers)
+        for record in sheet_rows.get(name, []):
+            dest.append([record.get(header) for header in headers])
 
     # Apply styling to every sheet (including Processing Info).
     for sheet in merged.worksheets:

@@ -63,6 +63,29 @@ def test_drop_columns_defaults_to_keeping_everything(tmp_path):
     assert list(wb["SPT"].iter_rows(values_only=True))[0] == ("depth_top", "page")
 
 
+def test_mixed_schema_merge_is_header_aware_and_backfills_source_file(tmp_path):
+    legacy = _write_book(tmp_path, "legacy.xlsx", {
+        "Material": [["Hole_ID", "from_mbgl"], ["BH1", 0.0]],
+    })
+    current = _write_book(tmp_path, "current.xlsx", {
+        "Material": [
+            ["Hole_ID", "Source_File", "to_mbgl", "from_mbgl"],
+            ["BH2", "backend-file", 2.0, 1.0],
+        ],
+    })
+
+    out = io.BytesIO(merge_excel_files(
+        [legacy, current],
+        source_files={legacy: "legacy-file", current: "mapping-file"},
+    ))
+    wb = load_workbook(out, data_only=True)
+    rows = list(wb["Material"].iter_rows(values_only=True))
+
+    assert rows[0] == ("Source_File", "Hole_ID", "from_mbgl", "to_mbgl")
+    assert rows[1] == ("legacy-file", "BH1", 0.0, None)
+    assert rows[2] == ("backend-file", "BH2", 1.0, 2.0)
+
+
 def test_processing_info_aggregated(tmp_path):
     a = _write_book(tmp_path, "a.xlsx", {
         "Processing Info": [["Metric", "Value"], ["Total Boreholes", "1"]],
