@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
 import pytest
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from boreholeai._merge import merge_results
 
@@ -144,3 +145,36 @@ def test_dir_labels_used_in_warnings(tmp_path):
     for w in result.warnings:
         assert "9c3a1234" not in w
         assert "1baf6345" not in w  # j1 wasn't missing anything; shouldn't appear
+
+
+def test_dir_labels_backfill_source_file_without_reprocessing(tmp_path):
+    j1 = _make_job_dir(tmp_path / "cached-job-1")
+    j2 = _make_job_dir(tmp_path / "cached-job-2")
+    out = tmp_path / "out"
+
+    merge_results(
+        [j1, j2],
+        out,
+        dir_labels={
+            j1: "HIS-series-001.pdf",
+            j2: "HIS-series-002.pdf",
+        },
+    )
+
+    workbook = load_workbook(
+        out / "Borehole_ground_profile_merged.xlsx",
+        data_only=True,
+    )
+    rows = list(workbook.active.iter_rows(values_only=True))
+    assert rows[0][0] == "Source_File"
+    assert [row[0] for row in rows[1:]] == [
+        "HIS-series-001",
+        "HIS-series-002",
+    ]
+
+    payload = json.loads((out / "Borehole_data_merged.json").read_text())
+    material_rows = payload["BH1"]["material_layers"]
+    assert [row["Source_File"] for row in material_rows] == [
+        "HIS-series-001",
+        "HIS-series-002",
+    ]

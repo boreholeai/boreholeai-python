@@ -219,3 +219,38 @@ def test_merge_json_drops_page_from_test_data_only(tmp_path):
     out = json.loads(merge_json_files([a]))
     assert out["test_data"]["SPT"] == [{"depth_top": 1.0, "SPT_N": 10}]
     assert out["ground_profile"]["material"] == [{"Hole_ID": "BH01", "page": 2}]
+
+
+def test_merge_json_backfills_source_file_but_preserves_backend_value(tmp_path):
+    import json
+
+    from boreholeai._merge._json import merge_json_files
+
+    legacy = tmp_path / "legacy.json"
+    legacy.write_text(json.dumps({
+        "ground_profile": {
+            "processing_info": [{"Metric": "Total Boreholes", "Value": "1"}],
+            "material": [{"Hole_ID": "BH01"}],
+        },
+    }))
+    current = tmp_path / "current.json"
+    current.write_text(json.dumps({
+        "ground_profile": {
+            "material": [{
+                "Hole_ID": "BH02",
+                "Source_File": "backend-file",
+            }],
+        },
+    }))
+
+    out = json.loads(merge_json_files(
+        [legacy, current],
+        source_files={legacy: "legacy-file", current: "mapping-file"},
+    ))
+    rows = out["ground_profile"]["material"]
+
+    assert next(iter(rows[0])) == "Source_File"
+    assert rows[0]["Source_File"] == "legacy-file"
+    assert next(iter(rows[1])) == "Source_File"
+    assert rows[1]["Source_File"] == "backend-file"
+    assert "Source_File" not in out["ground_profile"]["processing_info"][0]
