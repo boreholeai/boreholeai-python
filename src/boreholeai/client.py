@@ -132,6 +132,7 @@ class BoreholeAI:
         finalise_and_cleanup: Optional[bool] = None,
         retry_failed_pages: Optional[bool] = None,
         local_data: bool = False,
+        macro_button: bool = True,
     ) -> JobResult:
         """Submit, process, and merge a single file or a folder of files.
 
@@ -168,6 +169,20 @@ class BoreholeAI:
                 machine — requires a localhost base_url, and raises
                 ValueError otherwise. Job records, credits, and concurrency
                 accounting are unaffected.
+            macro_button: On by default — embeds a "Regenerate derived
+                tabs" VBA button in the ground profile workbook, which is
+                then saved as `.xlsm` instead of `.xlsx`. After
+                hand-correcting the Material tab in Excel, clicking the
+                button (on the Processing Info sheet) rebuilds the
+                Geology / Consistency_Density / USCS tabs from it. The
+                test-data workbook is unaffected. Pass False for a plain
+                macro-free `.xlsx`. If the packaged macro template is
+                broken, the ground profile falls back to the normal
+                `.xlsx` with a merge warning — this flag can never fail a
+                run. Note for sharing: copies downloaded from
+                email/SharePoint may open with Excel's macro-blocked
+                banner until the recipient unblocks the file; the workbook
+                data itself is always fully readable without the macro.
 
         Returns:
             JobResult — `status` is "completed", "partial", or "failed";
@@ -204,7 +219,9 @@ class BoreholeAI:
                 renderer.finalise()
 
         elapsed = time.monotonic() - start
-        return self._finalise(batch, files, out, elapsed, finalise_and_cleanup)
+        return self._finalise(
+            batch, files, out, elapsed, finalise_and_cleanup, macro_button,
+        )
 
     async def _run(
         self, files: list[Path], output_dir: Path, concurrency: int,
@@ -237,6 +254,7 @@ class BoreholeAI:
         self, batch: BatchResult, files: list[Path],
         output_dir: Path, elapsed: float,
         finalise_and_cleanup: Optional[bool] = None,
+        macro_button: bool = False,
     ) -> JobResult:
         """Merge successful jobs, log summary, build JobResult."""
         success_dirs = [
@@ -254,7 +272,10 @@ class BoreholeAI:
 
         merged_files: list[FileResult] = []
         if success_dirs:
-            mr = merge_results(success_dirs, output_dir, dir_labels=dir_labels)
+            mr = merge_results(
+                success_dirs, output_dir,
+                dir_labels=dir_labels, macro_button=macro_button,
+            )
             merged_files = [FileResult(filename=p.name, path=p) for p in mr.files]
             if mr.warnings:
                 _log(f"{len(mr.warnings)} merge warning(s) — see merge_warnings.txt")

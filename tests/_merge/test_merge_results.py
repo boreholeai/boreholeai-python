@@ -44,7 +44,7 @@ def test_single_job_copies_originals(tmp_path):
     job = _make_job_dir(tmp_path / "j1")
     out = tmp_path / "out"
 
-    result = merge_results([job], out)
+    result = merge_results([job], out, macro_button=False)
 
     names = sorted(f.name for f in result.files)
     assert "Borehole_ground_profile.xlsx" in names
@@ -65,7 +65,7 @@ def test_multi_job_produces_merged_files_no_warnings(tmp_path):
     j2 = _make_job_dir(tmp_path / "j2")
     out = tmp_path / "out"
 
-    result = merge_results([j1, j2], out)
+    result = merge_results([j1, j2], out, macro_button=False)
 
     names = sorted(f.name for f in result.files)
     assert "Borehole_ground_profile_merged.xlsx" in names
@@ -80,7 +80,7 @@ def test_missing_files_emit_warnings_and_log_file(tmp_path):
     j2 = _make_job_dir(tmp_path / "j2", ags=False, td=False)  # only gp
     out = tmp_path / "out"
 
-    result = merge_results([j1, j2], out)
+    result = merge_results([j1, j2], out, macro_button=False)
 
     # Warnings collected
     assert any("test_data" in w for w in result.warnings)
@@ -102,7 +102,7 @@ def test_partial_failure_still_merges_what_it_can(tmp_path):
     j2 = _make_job_dir(tmp_path / "j2", ags=False)
     out = tmp_path / "out"
 
-    result = merge_results([j1, j2], out)
+    result = merge_results([j1, j2], out, macro_button=False)
 
     names = {f.name for f in result.files}
     assert "Borehole_ground_profile_merged.xlsx" in names
@@ -118,7 +118,7 @@ def test_no_ags_anywhere_omits_ags_output(tmp_path):
     j2 = _make_job_dir(tmp_path / "j2", ags=False)
     out = tmp_path / "out"
 
-    result = merge_results([j1, j2], out)
+    result = merge_results([j1, j2], out, macro_button=False)
 
     names = {f.name for f in result.files}
     assert "Borehole_ags4_merged.ags" not in names
@@ -138,7 +138,7 @@ def test_dir_labels_used_in_warnings(tmp_path):
     out = tmp_path / "out"
     labels = {j1: "AU-BH401.pdf", j2: "AU-BH402.pdf"}
 
-    result = merge_results([j1, j2], out, dir_labels=labels)
+    result = merge_results([j1, j2], out, dir_labels=labels, macro_button=False)
 
     # Warning text references the human filename, not the UUID
     assert any("AU-BH402.pdf" in w for w in result.warnings)
@@ -159,6 +159,7 @@ def test_dir_labels_backfill_source_file_without_reprocessing(tmp_path):
             j1: "HIS-series-001.pdf",
             j2: "HIS-series-002.pdf",
         },
+        macro_button=False,
     )
 
     workbook = load_workbook(
