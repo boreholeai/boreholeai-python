@@ -57,6 +57,7 @@ def merge_excel_files(
     paths: Iterable[Path],
     drop_columns: frozenset[str] = frozenset(),
     source_files: Mapping[Path, str] | None = None,
+    macro_template: Path | None = None,
 ) -> bytes:
     """Merge multiple Excel files into one workbook, returned as bytes.
 
@@ -69,6 +70,10 @@ def merge_excel_files(
       • Columns whose header is in `drop_columns` are omitted (matched per
         source sheet, so per-file column positions may differ).
       • Styles are applied to every sheet at the end.
+      • When `macro_template` is given, that .xlsm — whose Processing Info
+        sheet carries the "Regenerate derived tabs" VBA button — is used as
+        the base workbook and its VBA project is preserved, so the returned
+        bytes are a macro-enabled workbook and must be saved as `.xlsm`.
     """
     paths = list(paths)
     if not paths:
@@ -78,9 +83,12 @@ def merge_excel_files(
         for path, stem in (source_files or {}).items()
     }
 
-    merged = Workbook()
-    # Workbook starts with one default sheet — remove it.
-    merged.remove(merged.active)
+    if macro_template is not None:
+        merged = load_workbook(macro_template, keep_vba=True)
+    else:
+        merged = Workbook()
+        # Workbook starts with one default sheet — remove it.
+        merged.remove(merged.active)
 
     # Pass 1: collect Processing Info sheets and build aggregated one.
     processing_infos: list[dict[str, str]] = []
@@ -93,7 +101,12 @@ def merge_excel_files(
             wb.close()
 
     if processing_infos:
-        dest_pi = merged.create_sheet("Processing Info")
+        # The macro template already carries this sheet (with the VBA
+        # button anchored to it) — write into it rather than duplicating.
+        if "Processing Info" in merged.sheetnames:
+            dest_pi = merged["Processing Info"]
+        else:
+            dest_pi = merged.create_sheet("Processing Info")
         build_merged_processing_info(processing_infos, dest_pi)
 
     # Pass 2: collect data sheets as header-addressed records. This prevents
@@ -162,6 +175,9 @@ def merge_excel_files(
 
     buf = io.BytesIO()
     merged.save(buf)
+    # keep_vba leaves the template's zip handle open; release it.
+    if merged.vba_archive is not None:
+        merged.vba_archive.close()
     return buf.getvalue()
 
 

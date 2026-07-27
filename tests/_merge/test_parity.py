@@ -28,7 +28,7 @@ def merged_outputs(tmp_path_factory) -> Path:
     out = tmp_path_factory.mktemp("parity_out")
     job_dirs = sorted(d for d in PER_JOB.iterdir() if d.is_dir())
     assert len(job_dirs) >= 2, "need at least 2 per-job fixtures"
-    merge_results(job_dirs, out)
+    merge_results(job_dirs, out, macro_button=False)
     return out
 
 
