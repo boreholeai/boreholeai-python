@@ -33,6 +33,12 @@ logger = logging.getLogger(__name__)
 
 _WARNINGS_FILENAME = "merge_warnings.txt"
 
+# Authored once in Excel from the .bas + base workbook in templates/ —
+# see templates/README.md. Required only when macro_button=True.
+_MACRO_TEMPLATE_PATH = (
+    Path(__file__).parent / "templates" / "ground_profile_template.xlsm"
+)
+
 
 @dataclass
 class MergeResult:
@@ -45,12 +51,22 @@ def merge_results(
     output_dir: Path,
     *,
     dir_labels: Optional[dict[Path, str]] = None,
+    macro_button: bool = True,
 ) -> MergeResult:
     """Merge per-job result directories into `output_dir`.
 
     `dir_labels` (optional): map each input dir → display name used in
     warnings (e.g. the original PDF filename). If not provided, the dir's
     own basename (typically a UUID) is used.
+
+    `macro_button` (default True): build the ground profile workbook on
+    the packaged macro template so it ships with a "Regenerate derived
+    tabs" VBA button on its Processing Info sheet, saved as `.xlsm`
+    instead of `.xlsx`. The test-data workbook is unaffected; pass False
+    for a plain macro-free `.xlsx`. If the template is missing or fails
+    to apply, the ground profile falls back to the standard macro-free
+    `.xlsx` and a warning is recorded — the macro is never allowed to
+    fail the merge.
 
     Raises ValueError on empty input. Missing per-job files are recorded
     as warnings, not errors — the merge proceeds for whichever categories
@@ -77,6 +93,16 @@ def merge_results(
 
     result = MergeResult()
 
+    macro_template: Optional[Path] = None
+    if macro_button:
+        macro_template = _MACRO_TEMPLATE_PATH
+        if not macro_template.is_file():
+            result.warnings.append(
+                f"macro button unavailable (template missing at "
+                f"{macro_template}); ground profile written without it"
+            )
+            macro_template = None
+
     if len(input_dirs) == 1:
         source_file = _source_file(input_dirs[0])
         for src in _glob_results(input_dirs[0]):
@@ -87,7 +113,29 @@ def merge_results(
             else:
                 dest = output_dir / src.name
             source_map = {src: source_file} if source_file else None
-            if src.suffix.lower() == ".xlsx" and source_map:
+            is_ground_profile = (
+                src.suffix.lower() == ".xlsx"
+                and src.name.startswith("Borehole_ground_profile")
+            )
+            macro_blob: bytes | None = None
+            if is_ground_profile and macro_template is not None:
+                # User-requested fallback: the macro is cosmetic — a broken
+                # template must never fail delivery of the results.
+                try:
+                    macro_blob = merge_excel_files(
+                        [src],
+                        source_files=source_map,
+                        macro_template=macro_template,
+                    )
+                except Exception as exc:
+                    result.warnings.append(
+                        f"macro button unavailable ({exc!r}); "
+                        f"{src.name} written without it"
+                    )
+            if macro_blob is not None:
+                dest = output_dir / (src.stem + ".xlsm")
+                dest.write_bytes(macro_blob)
+            elif src.suffix.lower() == ".xlsx" and source_map:
                 dest.write_bytes(merge_excel_files([src], source_files=source_map))
             elif src.name == "Borehole_data.json" and source_map:
                 dest.write_text(
@@ -144,11 +192,30 @@ def merge_results(
         annotated_pdfs.extend(sorted(d.glob("*_annotated.pdf")))
 
     if ground_profile_paths:
-        out = output_dir / "Borehole_ground_profile_merged.xlsx"
-        out.write_bytes(merge_excel_files(
-            ground_profile_paths,
-            source_files=excel_source_files,
-        ))
+        macro_blob: bytes | None = None
+        if macro_template is not None:
+            # User-requested fallback: the macro is cosmetic — a broken
+            # template must never fail delivery of the results.
+            try:
+                macro_blob = merge_excel_files(
+                    ground_profile_paths,
+                    source_files=excel_source_files,
+                    macro_template=macro_template,
+                )
+            except Exception as exc:
+                result.warnings.append(
+                    f"macro button unavailable ({exc!r}); "
+                    f"ground profile written without it"
+                )
+        if macro_blob is not None:
+            out = output_dir / "Borehole_ground_profile_merged.xlsm"
+            out.write_bytes(macro_blob)
+        else:
+            out = output_dir / "Borehole_ground_profile_merged.xlsx"
+            out.write_bytes(merge_excel_files(
+                ground_profile_paths,
+                source_files=excel_source_files,
+            ))
         result.files.append(out)
         logger.info(
             "merged ground_profile from %d file(s) → %s",
