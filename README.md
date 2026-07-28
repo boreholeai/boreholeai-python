@@ -58,10 +58,12 @@ pip install boreholeai
 ## Quick Start
 
 ```python
+import os
+
 from boreholeai import BoreholeAI
 
 # Get your API key at: https://boreholeai.com/app/settings/api-keys
-client = BoreholeAI(api_key="bhai_your_api_key_here")
+client = BoreholeAI(api_key=os.environ["BOREHOLEAI_API_KEY"])
 
 # Process a single borehole log
 result = client.process_documents("BH01.pdf", output_dir="./results")
@@ -145,8 +147,16 @@ A `merge_warnings.txt` file is written to `output_dir` only when warnings occur 
 
 Get your API key from the [BoreholeAI dashboard](https://boreholeai.com/app/settings/api-keys).
 
+Keep it out of your source — read it from the environment:
+
+```bash
+export BOREHOLEAI_API_KEY="bhai_xxx"
+```
+
 ```python
-client = BoreholeAI(api_key="bhai_xxx")
+import os
+
+client = BoreholeAI(api_key=os.environ["BOREHOLEAI_API_KEY"])
 ```
 
 ## Accuracy
