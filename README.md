@@ -111,7 +111,7 @@ client.process_documents("./logs/", output_dir="./results")
 
 ## Incremental Runs
 
-The SDK keeps its resume state (`.boreholeai_manifest.json` plus a `.boreholeai_workdir/` cache) after a successful run, so you can add more files to the same folder later and simply re-run: completed files are skipped, only new or changed files are processed, and the merged outputs are regenerated to cover everything. Each cache subfolder is labelled `<input filename> <job_id>` (for example, `ARU-K-PC04.pdf 1baf6345-ae8b-455f-8083-5f4cbd5ce382`) so it can be identified without opening the manifest.
+The SDK keeps its resume state (`.boreholeai_manifest.json` plus a `.boreholeai_workdir/` cache) after a successful run, so you can add more files to the same folder later and simply re-run: completed files are skipped, only new or changed files are processed, and the merged outputs are regenerated to cover everything. Each cache subfolder is labelled `<input filename> <job_id>` (for example, `BH01.pdf 00000000-0000-4000-8000-000000000000`) so it can be identified without opening the manifest.
 
 A file whose content changed on disk is detected and re-processed automatically; to force a single file to re-run by hand, set `"reprocess": true` on its entry in `.boreholeai_manifest.json`. A forced reprocess creates a new server job, replaces the active job ID, resets the active download/progress state, and removes the prior job's client-side cache folder once the replacement job is accepted. The old server-side job is not deleted by this setting.
 

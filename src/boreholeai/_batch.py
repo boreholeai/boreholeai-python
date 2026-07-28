@@ -120,12 +120,19 @@ _UNSAFE_WORKDIR_CHARS = '<>:"/\\|?*' + "".join(
 _WORKDIR_TRANS = str.maketrans({c: "_" for c in _UNSAFE_WORKDIR_CHARS})
 
 
+def _safe_component(component: str) -> str:
+    """Refuse components that resolve outside workdir ('', '.', '..')."""
+    return component if component not in ("", ".", "..") else "_"
+
+
 def _job_workdir_candidates(
     workdir: Path, filename: str, job_id: str,
 ) -> tuple[Path, Path]:
     """Return the labelled and legacy cache paths for one job."""
-    labelled_component = f"{filename} {job_id}".translate(_WORKDIR_TRANS)
-    legacy_component = str(job_id).translate(_WORKDIR_TRANS)
+    labelled_component = _safe_component(
+        f"{filename} {job_id}".translate(_WORKDIR_TRANS)
+    )
+    legacy_component = _safe_component(str(job_id).translate(_WORKDIR_TRANS))
     return workdir / labelled_component, workdir / legacy_component
 
 
