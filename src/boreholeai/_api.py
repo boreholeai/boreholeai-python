@@ -154,6 +154,13 @@ class APIClientAsync:
         since signed URLs go to Supabase Storage, not the API host.
         """
         if url.startswith("file://"):
+            if not self.local_data:
+                raise BoreholeAIError(
+                    "Server returned a file:// result URL for a job that was "
+                    "not created with local_data=True — refusing to read "
+                    "local files.",
+                    502,
+                )
             path = Path(url2pathname(urlsplit(url).path))
             try:
                 return await asyncio.to_thread(path.read_bytes)

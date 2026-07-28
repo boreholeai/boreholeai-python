@@ -163,9 +163,9 @@ def merge_excel_files(
                 header for header in headers if header != "Source_File"
             ]
         dest = merged.create_sheet(name)
-        dest.append(headers)
+        _append_text_safe(dest, headers)
         for record in sheet_rows.get(name, []):
-            dest.append([record.get(header) for header in headers])
+            _append_text_safe(dest, [record.get(header) for header in headers])
 
     # Apply styling to every sheet (including Processing Info).
     for sheet in merged.worksheets:
@@ -186,6 +186,19 @@ def merge_excel_files(
 # -------------------------------------------
 # Internal Helper Functions
 # -------------------------------------------
+
+def _append_text_safe(sheet: Worksheet, values: list[object]) -> None:
+    """Append a row, keeping '='-prefixed strings as text.
+
+    openpyxl coerces any string starting with '=' into a live formula;
+    per-job workbook cells are server-provided, so force them back to
+    inline strings to block formula injection into the merged workbook.
+    """
+    sheet.append(values)
+    for cell in sheet[sheet.max_row]:
+        if isinstance(cell.value, str) and cell.value.startswith("="):
+            cell.data_type = "s"
+
 
 def _apply_styles(sheet: Worksheet) -> None:
     """Apply backend-matching styles in place.
