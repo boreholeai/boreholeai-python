@@ -344,7 +344,7 @@ async def _submit_one(
     transient_attempts = 0
     while True:
         try:
-            data = await client.create_job([file_path])
+            data = await client.create_job(file_path)
             job_id = data.get("job_id") if isinstance(data, dict) else None
             if not job_id:
                 # Server accepted the POST but broke its contract — treat
