@@ -1,4 +1,4 @@
-"""Custom hatch build hook — stamps the build date into _version.py."""
+"""Custom hatch build hook — stamps the version and build date into _version.py."""
 
 import datetime
 import re
@@ -14,6 +14,13 @@ class CustomBuildHook(BuildHookInterface):
         today = datetime.date.today().isoformat()
         version_file = Path(self.root) / "src" / "boreholeai" / "_version.py"
         text = version_file.read_text()
+        # pyproject.toml is the single source of truth for the version —
+        # stamping __version__ here means a release bumps one place only.
+        text = re.sub(
+            r'__version__\s*=\s*"[^"]*"',
+            f'__version__ = "{self.metadata.version}"',
+            text,
+        )
         text = re.sub(
             r'__version_date__\s*=\s*"[^"]*"',
             f'__version_date__ = "{today}"',
