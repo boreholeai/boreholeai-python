@@ -106,17 +106,16 @@ class APIClientAsync:
     async def __aexit__(self, *args: object) -> None:
         await self.close()
 
-    async def create_job(self, file_paths: list[Path]) -> dict[str, Any]:
-        """POST /v1/jobs — upload files and create a job."""
+    async def create_job(self, file_path: Path) -> dict[str, Any]:
+        """POST /v1/jobs — upload one file and create a job.
+
+        The server accepts exactly one file per request; batch runs fan
+        out one job per file (see _batch).
+        """
         client = await self._connect()
-        # Read files concurrently in threads so the event loop isn't blocked.
-        contents = await asyncio.gather(
-            *(asyncio.to_thread(p.read_bytes) for p in file_paths),
-        )
-        files = [
-            ("files", (p.name, content))
-            for p, content in zip(file_paths, contents)
-        ]
+        # Read in a thread so the event loop isn't blocked.
+        content = await asyncio.to_thread(file_path.read_bytes)
+        files = [("files", (file_path.name, content))]
         data = {"data_plane": "local"} if self.local_data else None
         resp = await client.post("/v1/jobs", files=files, data=data)
         _raise_for_status(resp)
