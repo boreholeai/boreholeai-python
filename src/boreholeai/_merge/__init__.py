@@ -2,18 +2,23 @@
 
 After SDK fan-out completes, each completed job has its own directory
 holding `Borehole_ground_profile*.xlsx`, `Borehole_test_data*.xlsx`,
-`Borehole_ags4*.ags`, and `*_annotated.pdf`. `merge_results` reads those
-N directories and writes:
+`Borehole_ags4*.ags`, `Borehole_data.json`, and `*_annotated.pdf`.
+`merge_results` reads those N directories and writes:
 
     output_dir/
-        Borehole_ground_profile_merged.xlsx     (when N > 1)
+        Borehole_ground_profile_merged.xlsx     (when N > 1; .xlsm when
+                                                 macro_button=True and the
+                                                 macro template applies)
         Borehole_test_data_merged.xlsx          (when N > 1)
         Borehole_ags4_merged.ags                (when N > 1)
+        Borehole_data_merged.json               (when N > 1)
         annotated_pdf/<file>_annotated.pdf      (one per source file)
         merge_warnings.txt                      (only if warnings emitted)
 
-For N == 1, files are copied with their original names (no `_merged`
-suffix), matching the frontend "Download Selected" single-job behavior.
+For N == 1, files keep their original names (no `_merged` suffix),
+matching the frontend "Download Selected" single-job behavior — except
+the ground profile, which still becomes `.xlsm` when the macro button
+applies.
 """
 
 from __future__ import annotations
@@ -51,7 +56,7 @@ def merge_results(
     output_dir: Path,
     *,
     dir_labels: Optional[dict[Path, str]] = None,
-    macro_button: bool = True,
+    macro_button: bool = False,
 ) -> MergeResult:
     """Merge per-job result directories into `output_dir`.
 
@@ -59,14 +64,14 @@ def merge_results(
     warnings (e.g. the original PDF filename). If not provided, the dir's
     own basename (typically a UUID) is used.
 
-    `macro_button` (default True): build the ground profile workbook on
-    the packaged macro template so it ships with a "Regenerate derived
-    tabs" VBA button on its Processing Info sheet, saved as `.xlsm`
-    instead of `.xlsx`. The test-data workbook is unaffected; pass False
-    for a plain macro-free `.xlsx`. If the template is missing or fails
-    to apply, the ground profile falls back to the standard macro-free
-    `.xlsx` and a warning is recorded — the macro is never allowed to
-    fail the merge.
+    `macro_button` (default False): when True, build the ground profile
+    workbook on the packaged macro template so it ships with a
+    "Regenerate derived tabs" VBA button on its Processing Info sheet,
+    saved as `.xlsm` instead of `.xlsx`. The test-data workbook is
+    unaffected; the default produces a plain macro-free `.xlsx`. If the
+    template is missing or fails to apply, the ground profile falls back
+    to the standard macro-free `.xlsx` and a warning is recorded — the
+    macro is never allowed to fail the merge.
 
     Raises ValueError on empty input. Missing per-job files are recorded
     as warnings, not errors — the merge proceeds for whichever categories

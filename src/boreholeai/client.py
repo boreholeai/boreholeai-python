@@ -89,8 +89,8 @@ class BoreholeAI:
         result = client.process_documents("./logs/", output_dir="./results")
 
     For a folder of N files, this processes them in parallel, downloads
-    all outputs, then produces one merged ground_profile / test_data / AGS
-    file.
+    all outputs, then produces one merged ground_profile / test_data /
+    AGS / data-JSON file (plus per-file annotated PDFs).
 
     Resumes automatically if interrupted: re-running with the same
     `output_dir` skips already-completed work.
@@ -132,7 +132,7 @@ class BoreholeAI:
         finalise_and_cleanup: Optional[bool] = None,
         retry_failed_pages: Optional[bool] = None,
         local_data: bool = False,
-        macro_button: bool = True,
+        macro_button: bool = False,
     ) -> JobResult:
         """Submit, process, and merge a single file or a folder of files.
 
@@ -169,14 +169,14 @@ class BoreholeAI:
                 machine — requires a localhost base_url, and raises
                 ValueError otherwise. Job records, credits, and concurrency
                 accounting are unaffected.
-            macro_button: On by default — embeds a "Regenerate derived
+            macro_button: Off by default — the ground profile is a plain
+                macro-free `.xlsx`. Pass True to embed a "Regenerate derived
                 tabs" VBA button in the ground profile workbook, which is
                 then saved as `.xlsm` instead of `.xlsx`. After
                 hand-correcting the Material tab in Excel, clicking the
                 button (on the Processing Info sheet) rebuilds the
                 Geology / Consistency_Density / USCS tabs from it. The
-                test-data workbook is unaffected. Pass False for a plain
-                macro-free `.xlsx`. If the packaged macro template is
+                test-data workbook is unaffected. If the packaged macro template is
                 broken, the ground profile falls back to the normal
                 `.xlsx` with a merge warning — this flag can never fail a
                 run. Note for sharing: copies downloaded from

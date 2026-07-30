@@ -5,7 +5,8 @@ Tracks per-input-file state in a JSON sidecar at
 and process restarts so a re-run can skip already-completed work.
 
 Pure persistence layer — no networking, no async, no concurrency. Used
-by `_batch.py` (Phase 4) and `client.py` (Phase 5).
+by `_batch.py` (batch orchestration) and `client.py` (pre-flight peeks
+and finalisation).
 """
 
 from __future__ import annotations

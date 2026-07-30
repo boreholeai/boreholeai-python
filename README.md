@@ -40,9 +40,12 @@ Upload borehole log PDFs or images, get structured ground profiles, test data, a
 - Borehole metadata — hole ID, location, dates, drilling method
 
 **Outputs:**
-- `Borehole_ground_profile.xlsx` — structured ground profile table
+- `Borehole_ground_profile.xlsx` — structured ground profile table (pass
+  `macro_button=True` for a `.xlsm` with a "Regenerate derived tabs" macro
+  button that rebuilds the derived tabs after hand corrections)
 - `Borehole_test_data.xlsx` — all test results in tabular format
 - `Borehole_ags4.ags` — industry-standard AGS4 data transfer file
+- `Borehole_data.json` — the same extracted data as machine-readable JSON
 - `*_annotated.pdf` — original document with extracted regions highlighted
 
 ## Examples
@@ -87,7 +90,7 @@ result = client.process_documents(
 )
 
 # Output:
-#   Borehole_ground_profile_merged.xlsx
+#   Borehole_ground_profile_merged.xlsx   (.xlsm with macro_button=True)
 #   Borehole_test_data_merged.xlsx
 #   Borehole_ags4_merged.ags
 #   Borehole_data_merged.json
@@ -98,6 +101,12 @@ result = client.process_documents(
 ```
 
 A single-file run keeps the original filenames (no `_merged` suffix).
+
+The ground profile workbook ships as a plain macro-free `.xlsx` by default.
+Pass `macro_button=True` to `process_documents` for a macro-enabled `.xlsm`
+whose Processing Info sheet carries a "Regenerate derived tabs" button that
+rebuilds the Geology / Consistency_Density / USCS tabs from a hand-corrected
+Material tab.
 
 ## Resume After Interrupt
 

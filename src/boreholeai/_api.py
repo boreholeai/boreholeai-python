@@ -21,6 +21,11 @@ from boreholeai.exceptions import (
 )
 
 DEFAULT_BASE_URL = "https://api1.boreholeai.com"
+# Candidate hosts tried in order by `_connect`. Note: api2/api3 are
+# forward-looking names for a multi-host deployment that is not live
+# infrastructure today — expect only the primary host to answer. The
+# failover loop simply skips hosts that don't resolve or connect, so
+# listing them is harmless and needs no code change if/when they exist.
 DEFAULT_URLS = [
     "https://api1.boreholeai.com",
     "https://api2.boreholeai.com",
@@ -31,11 +36,11 @@ CONNECT_TIMEOUT = 5.0
 
 
 class APIClientAsync:
-    """Async sibling of `APIClient` — same surface, asyncio-native.
+    """Asyncio-native HTTP layer — the SDK's only API client.
 
-    Owns auth headers, base-URL failover, and the underlying httpx clients.
-    Used by `_batch.py` for concurrent submit / poll / download. Sync code
-    paths keep using `APIClient`.
+    Owns auth headers, base-URL selection (`_connect` tries each candidate
+    in DEFAULT_URLS), and the underlying httpx clients. Used by `_batch.py`
+    for concurrent submit / poll / download.
 
     The optional `_transport` kwarg is a test seam (`httpx.MockTransport`).
     Pass `None` in production.
