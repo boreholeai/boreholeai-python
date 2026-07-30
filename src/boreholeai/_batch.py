@@ -1,12 +1,15 @@
 """Fan-out + poll + download orchestration for SDK batch processing.
 
-Reads/writes the manifest, calls APIClientAsync for HTTP. Three phases
-run sequentially, but within each phase all files are processed
-concurrently:
+Reads/writes the manifest, calls APIClientAsync for HTTP. All files run
+their submit → poll → download lifecycle concurrently, gated by two
+semaphores:
 
-   SUBMIT    bounded by Semaphore(concurrency)
-   POLL      unbounded — polling is idle wait, not real load
-   DOWNLOAD  bounded by Semaphore(concurrency)
+   SUBMIT + POLL  bounded by cap_sem (sized to the server's per-user
+                  concurrency cap) — a slot is held for the job's whole
+                  server-side life, matching the server's cap semantics
+   DOWNLOAD       bounded by download_sem — a terminal job no longer
+                  consumes the server cap, so downloads only need a
+                  bandwidth bound and never block the next submit
 
 State is checkpointed to the manifest after every transition, so a
 Ctrl-C or network drop can be resumed by re-invoking with the same
@@ -335,8 +338,8 @@ async def _submit_one(
     """Submit one file, waiting out 429 backpressure and retrying
     transient errors with exponential backoff.
 
-    Caller is expected to hold the per-file semaphore (`_submit_and_poll`
-    wraps this in `async with sem:`) so the slot is reserved for the
+    Caller is expected to hold the concurrency semaphore (`_process_one`
+    wraps this in `async with cap_sem:`) so the slot is reserved for the
     entire submit + poll lifecycle, matching the server's cap semantics.
     """
     delay = _SUBMIT_RETRY_BASE
@@ -769,16 +772,25 @@ def _page_failure_warning(job_workdir: Path) -> Optional[str]:
 async def _retry_transport(
     fn: Callable[[], Coroutine[Any, Any, Any]], what: str, name: str,
 ) -> Any:
-    """Await `fn()`, retrying transient network errors with backoff.
+    """Await `fn()`, retrying transient errors with backoff.
 
-    Only retries httpx.TransportError (timeouts, dropped connections);
-    HTTP-level and SDK errors propagate to the caller unchanged.
+    Retries httpx.TransportError (timeouts, dropped connections),
+    server-side 5xx on the signed-URL fetch (httpx.HTTPStatusError with
+    status >= 500 — storage blips), and ServerError (the API's own 5xx /
+    invalid-JSON classification). 4xx statuses and other SDK errors
+    propagate to the caller unchanged — an expired signed URL is not
+    transient and must fail the file so a re-run re-fetches fresh URLs.
     """
     delay = _DOWNLOAD_RETRY_BASE
     for attempt in range(1, _DOWNLOAD_MAX_RETRIES + 1):
         try:
             return await fn()
-        except httpx.TransportError as exc:
+        except (httpx.TransportError, httpx.HTTPStatusError, ServerError) as exc:
+            if (
+                isinstance(exc, httpx.HTTPStatusError)
+                and exc.response.status_code < 500
+            ):
+                raise
             if attempt >= _DOWNLOAD_MAX_RETRIES:
                 raise
             logger.warning(
