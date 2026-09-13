@@ -10,6 +10,8 @@ build/
 .pytest_cache/
 tests/*
 !tests/test_ags_integrity.py
+!tests/test_ags_source_variants.py
 !tests/fixtures/
 tests/fixtures/*
 !tests/fixtures/ags-merge-integrity.json
+!tests/fixtures/ags-source-variants.json

@@ -1,0 +1,459 @@
+[
+  {
+    "name": "different_ids",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH2\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH2\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH2\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH2\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "counts": {
+      "LOCA": 2,
+      "GEOL": 2,
+      "SAMP": 2,
+      "RPLT": 2
+    },
+    "ids": [
+      "BH1",
+      "BH2"
+    ]
+  },
+  {
+    "name": "identical_complete_copies",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "counts": {
+      "LOCA": 1,
+      "GEOL": 1,
+      "SAMP": 1,
+      "RPLT": 1
+    },
+    "ids": [
+      "BH1"
+    ]
+  },
+  {
+    "name": "changed_depth",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"25.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"25.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "counts": {
+      "LOCA": 2,
+      "GEOL": 2,
+      "SAMP": 2,
+      "RPLT": 2
+    },
+    "renamed": true,
+    "depths": [
+      "20.00",
+      "25.00"
+    ]
+  },
+  {
+    "name": "changed_test_only",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.65\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "counts": {
+      "LOCA": 2,
+      "GEOL": 2,
+      "SAMP": 2,
+      "RPLT": 2
+    },
+    "renamed": true,
+    "results": [
+      "0.45",
+      "0.65"
+    ]
+  },
+  {
+    "name": "missing_test_family",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "counts": {
+      "LOCA": 2,
+      "GEOL": 2,
+      "SAMP": 1,
+      "RPLT": 1
+    },
+    "renamed": true
+  },
+  {
+    "name": "row_multiplicity",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "counts": {
+      "LOCA": 2,
+      "GEOL": 3,
+      "SAMP": 2,
+      "RPLT": 2
+    },
+    "renamed": true
+  },
+  {
+    "name": "duplicate_plus_conflict",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.65\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Copy2024.pdf",
+        "job_id": "job-copy"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "counts": {
+      "LOCA": 2,
+      "GEOL": 2,
+      "SAMP": 2,
+      "RPLT": 2
+    },
+    "renamed": true,
+    "provenance_count": 3
+  },
+  {
+    "name": "same_source_filename",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.65\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "counts": {
+      "LOCA": 2,
+      "GEOL": 2,
+      "SAMP": 2,
+      "RPLT": 2
+    },
+    "renamed": true
+  },
+  {
+    "name": "unicode_source_names",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.65\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "報告 \"2024\".pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Rapport É2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "counts": {
+      "LOCA": 2,
+      "GEOL": 2,
+      "SAMP": 2,
+      "RPLT": 2
+    },
+    "renamed": true
+  },
+  {
+    "name": "insert_location_remarks",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.65\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "counts": {
+      "LOCA": 2,
+      "GEOL": 2,
+      "SAMP": 2,
+      "RPLT": 2
+    },
+    "renamed": true
+  },
+  {
+    "name": "rewrite_record_links",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SAMP_LINK\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"RL\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"LOCA|BH1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SAMP_LINK\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"RL\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"LOCA|BH1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.65\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "counts": {
+      "LOCA": 2,
+      "GEOL": 2,
+      "SAMP": 2,
+      "RPLT": 2
+    },
+    "renamed": true,
+    "links": true
+  },
+  {
+    "name": "custom_record_link_delimiters",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\":\",\"~\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SAMP_LINK\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"RL\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"LOCA:BH1~LOCA:BH1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\":\",\"~\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SAMP_LINK\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"RL\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"LOCA:BH1~LOCA:BH1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.65\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "counts": {
+      "LOCA": 2,
+      "GEOL": 2,
+      "SAMP": 2,
+      "RPLT": 2
+    },
+    "renamed": true,
+    "links": true
+  },
+  {
+    "name": "incompatible_units",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"kPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "error": "UNIT conflict"
+  },
+  {
+    "name": "different_projects",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P2\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "error": "PROJ_ID"
+  },
+  {
+    "name": "different_link_delimiters",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\":\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "error": "TRAN_DLIM"
+  },
+  {
+    "name": "unresolved_record_link",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SAMP_LINK\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"RL\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"MISSING|BH1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.45\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"Logged by: Sam\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Reported clay\"\n\n\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SAMP_LINK\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"RL\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"MISSING|BH1\"\n\n\"GROUP\",\"RPLT\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RPLT_PLSI\"\n\"UNIT\",\"\",\"m\",\"\",\"\",\"\",\"\",\"m\",\"MPa\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\",\"X\",\"2DP\",\"2SF\"\n\"DATA\",\"BH1\",\"2.00\",\"001\",\"\",\"S1\",\"A1\",\"2.00\",\"0.65\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "error": "record link"
+  },
+  {
+    "name": "project_metadata_differs",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_LOC\",\"PROJ_CLNT\",\"FILE_FSET\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"P1\",\"Highway Upgrade\",\"Site A\",\"Council\",\"\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Clay\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_LOC\",\"PROJ_CLNT\",\"FILE_FSET\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"P1\",\"Highway Upgrade Stage 2\",\"Site B\",\"Council\",\"\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Clay\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "counts": {
+      "LOCA": 1,
+      "GEOL": 1
+    },
+    "ids": [
+      "BH1"
+    ],
+    "proj": {
+      "PROJ_NAME": "Highway Upgrade",
+      "PROJ_LOC": "Site A",
+      "PROJ_CLNT": "Council",
+      "PROJ_MEMO": "AGS source variants; PROJ_LOC differs: [[\"Site A\",\"Report2024.pdf\",\"job-a\"],[\"Site B\",\"Report2025.pdf\",\"job-b\"]]; PROJ_NAME differs: [[\"Highway Upgrade Stage 2\",\"Report2025.pdf\",\"job-b\"],[\"Highway Upgrade\",\"Report2024.pdf\",\"job-a\"]]"
+    }
+  },
+  {
+    "name": "location_less_fragment",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_LOC\",\"PROJ_CLNT\",\"FILE_FSET\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"P1\",\"Highway Upgrade\",\"Site A\",\"Council\",\"\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"\",\"20.00\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_LOC\",\"PROJ_CLNT\",\"FILE_FSET\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"P1\",\"Highway Upgrade\",\"Site A\",\"Council\",\"\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH2\",\"0.00\",\"1.00\",\"Clay\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "error": "missing parent location"
+  },
+  {
+    "name": "project_metadata_differs_short_rows",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_MEMO\",\"FILE_FSET\"\n\"UNIT\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"X\",\"X\",\"X\"\n\"DATA\",\"P1\",\"Highway Upgrade\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"\",\"20.00\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_MEMO\",\"FILE_FSET\"\n\"UNIT\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"X\",\"X\",\"X\"\n\"DATA\",\"P1\",\"Highway Upgrade Stage 2\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"\",\"20.00\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "counts": {
+      "LOCA": 1
+    },
+    "ids": [
+      "BH1"
+    ],
+    "proj": {
+      "PROJ_NAME": "Highway Upgrade",
+      "PROJ_MEMO": "AGS source variants; PROJ_NAME differs: [[\"Highway Upgrade Stage 2\",\"Report2025.pdf\",\"job-b\"],[\"Highway Upgrade\",\"Report2024.pdf\",\"job-a\"]]",
+      "FILE_FSET": ""
+    }
+  }
+]

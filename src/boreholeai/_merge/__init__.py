@@ -23,6 +23,7 @@ applies.
 
 from __future__ import annotations
 
+import json
 import logging
 import shutil
 from dataclasses import dataclass, field
@@ -30,7 +31,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from boreholeai._merge._ags import AgsMergeConflict, merge_ags_files
+from boreholeai._merge._ags import AgsMergeConflict, AgsSource, merge_ags_files
 from boreholeai._merge._excel import merge_excel_files
 from boreholeai._merge._json import merge_json_files
 
@@ -56,6 +57,7 @@ def merge_results(
     output_dir: Path,
     *,
     dir_labels: Optional[dict[Path, str]] = None,
+    dir_job_ids: Optional[dict[Path, str]] = None,
     macro_button: bool = False,
 ) -> MergeResult:
     """Merge per-job result directories into `output_dir`.
@@ -63,6 +65,9 @@ def merge_results(
     `dir_labels` (optional): map each input dir → display name used in
     warnings (e.g. the original PDF filename). If not provided, the dir's
     own basename (typically a UUID) is used.
+
+    `dir_job_ids` optionally supplies the actual source job IDs for AGS merge
+    provenance. Directory names are not interpreted as job IDs.
 
     `macro_button` (default False): when True, build the ground profile
     workbook on the packaged macro template so it ships with a
@@ -87,6 +92,9 @@ def merge_results(
     # Resolve label keys to absolute Paths so caller can pass either.
     resolved_labels: dict[Path, str] = {
         Path(k).resolve(): v for k, v in (dir_labels or {}).items()
+    }
+    resolved_job_ids = {
+        Path(k).resolve(): v for k, v in (dir_job_ids or {}).items()
     }
 
     def _label(d: Path) -> str:
@@ -155,10 +163,14 @@ def merge_results(
     ground_profile_paths: list[Path] = []
     test_data_paths: list[Path] = []
     ags_paths: list[Path] = []
+    ags_sources: list[AgsSource] = []
     json_paths: list[Path] = []
     annotated_pdfs: list[Path] = []
     excel_source_files: dict[Path, str] = {}
     json_source_files: dict[Path, str] = {}
+    json_ags_sources: dict[Path, AgsSource] = {}
+    location_mapping: list[dict] = []
+    ags_created = False
 
     for d in input_dirs:
         gp = _find_one(d, "Borehole_ground_profile*.xlsx")
@@ -186,6 +198,10 @@ def merge_results(
             result.warnings.append(f"{label}: no AGS file found")
         else:
             ags_paths.append(ags)
+            # Without labels the directory name is the identity: unique per job, never the shared AGS filename.
+            ags_sources.append(AgsSource(
+                source_file=label, job_id=resolved_job_ids.get(d.resolve(), ""),
+            ))
 
         if js is None:
             result.warnings.append(f"{label}: no Borehole_data JSON found")
@@ -193,6 +209,9 @@ def merge_results(
             json_paths.append(js)
             if source_file:
                 json_source_files[js] = source_file
+            json_ags_sources[js] = AgsSource(
+                source_file=label, job_id=resolved_job_ids.get(d.resolve(), ""),
+            )
 
         annotated_pdfs.extend(sorted(d.glob("*_annotated.pdf")))
 
@@ -245,7 +264,9 @@ def merge_results(
     if ags_paths:
         out = output_dir / "Borehole_ags4_merged.ags"
         try:
-            merged_ags = merge_ags_files(ags_paths)
+            merged_ags = merge_ags_files(
+                ags_paths, sources=ags_sources, location_mapping=location_mapping
+            )
         except AgsMergeConflict as exc:
             # A prior run must not leave a stale merged AGS beside the conflict report.
             out.unlink(missing_ok=True)
@@ -258,15 +279,22 @@ def merge_results(
                 result.files.append(destination)
         else:
             out.write_text(merged_ags, encoding="utf-8")
+            ags_created = True
             result.files.append(out)
             logger.info("merged AGS from %d file(s) → %s", len(ags_paths), out)
 
     if json_paths:
         out = output_dir / "Borehole_data_merged.json"
-        out.write_text(
-            merge_json_files(json_paths, source_files=json_source_files),
-            encoding="utf-8",
-        )
+        merged_json = json.loads(merge_json_files(
+            json_paths, source_files=json_source_files, ags_sources=json_ags_sources,
+        ))
+        merged_json.setdefault("ags_export", {}).update({
+            "reconciliation_scope": "source_ags",
+            "merge_status": "created" if ags_created else "not_created" if ags_paths else "no_ags",
+            "merged_ags_file": "Borehole_ags4_merged.ags" if ags_created else None,
+            "location_mapping": location_mapping if ags_created else [],
+        })
+        out.write_text(json.dumps(merged_json, indent=2), encoding="utf-8")
         result.files.append(out)
         logger.info(
             "merged data JSON from %d file(s) → %s",
