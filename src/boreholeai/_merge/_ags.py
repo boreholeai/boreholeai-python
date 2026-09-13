@@ -1,7 +1,7 @@
 """AGS4 file parsing, merging, and writing.
 
 Mirrors the TypeScript implementation in
-`frontend/src/app/api/jobs/download/route.ts` (post CSV-parser fix).
+`frontend/src/lib/ags-merge.ts` (post CSV-parser fix).
 Any rule change here must also land in the TS source.
 """
 
@@ -22,6 +22,10 @@ META_GROUPS = frozenset({"UNIT", "TYPE", "ABBR", "DICT"})
 
 # Output order: these named groups come first (in this order), then everything else.
 OUTPUT_ORDER = ("PROJ", "TRAN", "UNIT", "TYPE", "ABBR", "DICT")
+
+
+class AgsMergeConflict(ValueError):
+    """Source AGS schemas cannot be merged without changing meaning."""
 
 
 @dataclass
@@ -75,7 +79,7 @@ def merge_ags_files(paths: Iterable[Path]) -> str:
                 _align_headings(existing, group)
                 seen = {tuple(r) for r in existing.data}
                 for row in group.data:
-                    padded = _pad_row(list(row), len(existing.headings))
+                    padded = _align_row(row, group.headings, existing.headings)
                     key = tuple(padded)
                     if key not in seen:
                         existing.data.append(padded)
@@ -91,12 +95,12 @@ def merge_ags_files(paths: Iterable[Path]) -> str:
 
             if loca_idx == -1:
                 for row in group.data:
-                    existing.data.append(_pad_row(list(row), len(existing.headings)))
+                    existing.data.append(_align_row(row, group.headings, existing.headings))
                 continue
 
             incoming_by_loca: dict[str, list[list[str]]] = {}
             for row in group.data:
-                padded = _pad_row(list(row), len(existing.headings))
+                padded = _align_row(row, group.headings, existing.headings)
                 loca_id = padded[loca_idx] if loca_idx < len(padded) else ""
                 incoming_by_loca.setdefault(loca_id, []).append(padded)
 
@@ -108,6 +112,7 @@ def merge_ags_files(paths: Iterable[Path]) -> str:
             for rows in incoming_by_loca.values():
                 existing.data.extend(rows)
 
+    _validate_strength_links(merged)
     return _write_ags(merged)
 
 
@@ -189,17 +194,46 @@ def _parse_ags_line(line: str) -> list[str]:
 
 
 def _align_headings(existing: AgsGroup, incoming: AgsGroup) -> None:
-    """Expand `existing.headings` to include any new headings from `incoming`.
+    """Align by name; reject metadata conflicts and indeterminate dictionary order."""
+    headings = list(dict.fromkeys(existing.headings + incoming.headings))
+    edges = {heading: set() for heading in headings}
+    for source in (existing.headings, incoming.headings):
+        if len(set(source)) != len(source):
+            raise AgsMergeConflict(f"AGS {existing.name}: duplicate heading")
+        for previous, following in zip(source, source[1:]):
+            edges[previous].add(following)
+    ordered: list[str] = []
+    remaining = set(headings)
+    while remaining:
+        candidates = [h for h in remaining if not any(h in edges[other] for other in remaining)]
+        if len(candidates) != 1:
+            raise AgsMergeConflict(f"AGS {existing.name}: ambiguous or conflicting heading order; retain original files")
+        ordered.append(candidates[0])
+        remaining.remove(candidates[0])
+    for heading in existing.headings:
+        if heading not in incoming.headings:
+            continue
+        i, j = existing.headings.index(heading), incoming.headings.index(heading)
+        for descriptor in ("unit", "type"):
+            old, new = getattr(existing, descriptor), getattr(incoming, descriptor)
+            before, after = old[i] if i < len(old) else "", new[j] if j < len(new) else ""
+            if before != after:
+                raise AgsMergeConflict(
+                    f"AGS {existing.name}.{heading}: {descriptor.upper()} conflict "
+                    f"({before or 'unknown'} vs {after or 'unknown'}); retain original files"
+                )
+    original = existing.headings
+    for descriptor in ("unit", "type"):
+        old = dict(zip(original, getattr(existing, descriptor)))
+        new = dict(zip(incoming.headings, getattr(incoming, descriptor)))
+        setattr(existing, descriptor, [old.get(h, "") if h in original else new.get(h, "") for h in ordered])
+    existing.data = [_align_row(row, original, ordered) for row in existing.data]
+    existing.headings = ordered
 
-    Pads existing data rows with empty strings to match the new width.
-    """
-    for i, heading in enumerate(incoming.headings):
-        if heading not in existing.headings:
-            existing.headings.append(heading)
-            existing.unit.append(incoming.unit[i] if i < len(incoming.unit) else "")
-            existing.type.append(incoming.type[i] if i < len(incoming.type) else "")
-            for row in existing.data:
-                row.append("")
+
+def _align_row(row: list[str], source: list[str], target: list[str]) -> list[str]:
+    values = dict(zip(source, row))
+    return [values.get(heading, "") for heading in target]
 
 
 def _pad_row(row: list[str], length: int) -> list[str]:
@@ -207,6 +241,42 @@ def _pad_row(row: list[str], length: int) -> list[str]:
     if len(row) >= length:
         return row
     return row + [""] * (length - len(row))
+
+
+def _validate_strength_links(groups: dict[str, AgsGroup]) -> None:
+    """Reject key collisions/orphan samples rather than reconciling report revisions."""
+    sample_key = ["LOCA_ID", "SAMP_TOP", "SAMP_REF", "SAMP_TYPE", "SAMP_ID"]
+    keys = {
+        "UNIT": ["UNIT_UNIT"],
+        "TYPE": ["TYPE_TYPE"],
+        "ABBR": ["ABBR_HDNG", "ABBR_CODE"],
+        "DICT": ["DICT_TYPE", "DICT_GRP", "DICT_HDNG"],
+        "SAMP": sample_key,
+        "RPLT": sample_key + ["SPEC_REF", "SPEC_DPTH"],
+        "RUCS": sample_key + ["SPEC_REF", "SPEC_DPTH"],
+        "IPEN": ["LOCA_ID", "IPEN_DPTH", "IPEN_TESN"],
+        "IVAN": ["LOCA_ID", "IVAN_DPTH", "IVAN_TESN"],
+    }
+    for name, columns in keys.items():
+        group = groups.get(name)
+        if group is None or not all(h in group.headings for h in columns):
+            continue
+        seen = set()
+        for row in group.data:
+            key = tuple(_align_row(row, group.headings, columns))
+            if key in seen:
+                raise AgsMergeConflict(f"AGS {name}: duplicate test/sample key {key}; report revisions require reconciliation; retain original files")
+            seen.add(key)
+    samples = groups.get("SAMP")
+    for name in ("RPLT", "RUCS"):
+        group = groups.get(name)
+        if group is None or not all(h in group.headings for h in sample_key):
+            continue
+        parents = {tuple(_align_row(row, samples.headings, sample_key)) for row in samples.data} if samples else set()
+        for row in group.data:
+            key = tuple(_align_row(row, group.headings, sample_key))
+            if key not in parents:
+                raise AgsMergeConflict(f"AGS {name}: missing parent sample {key}; report revisions require reconciliation; retain original files")
 
 
 def _write_ags(groups: dict[str, AgsGroup]) -> str:

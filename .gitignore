@@ -8,4 +8,8 @@ build/
 .DS_Store
 .claude/
 .pytest_cache/
-tests/
+tests/*
+!tests/test_ags_integrity.py
+!tests/fixtures/
+tests/fixtures/*
+!tests/fixtures/ags-merge-integrity.json
