@@ -178,17 +178,17 @@ We have tested extensively across a wide range of publicly available borehole lo
 
 That said, borehole logs vary significantly in layout and formatting. If you find an inaccuracy or an extraction issue, please [let us know](mailto:support@boreholeai.com) — every report helps us improve the system.
 
-**Expected input:** Properly formatted borehole log PDFs or clean scanned copies. Photos taken on site (e.g. phone camera shots of printed logs) are not supported and may produce unreliable results.
+**Expected input:** Borehole log PDFs, scanned copies, handwritten logs, or photos taken directly on site (e.g. a phone camera shot of a printed or handwritten log).
 
 ## Current Scope and Limitations
 
-- **Standard alignment:** Built and validated against **Australian Standard AS 1726** borehole log formats. Logs following other national standards may work but are not yet validated.
+- **Standard alignment:** Not limited to Australian/NZ logs. Validated most extensively against **Australian Standard AS 1726** formats; logs following other national standards are supported. If your logs use a non-standard or customised layout, [contact us](mailto:support@boreholeai.com).
 - **Document types:** Borehole logs (BH), pavement core logs (PCP), and test pit logs (TP). Other geotechnical documents (e.g. CPT plots, lab reports) are not currently supported.
-- **Languages:** English only. Other languages may partially work but are not officially supported.
+- **Languages:** Not limited to English — logs in other languages are supported.
 - **Units:** Metric only — depths and dimensions must be in metres. Logs in feet or other imperial units are not currently supported.
-- **Scan quality:** Logs should be scanned orthogonally. Tilted scans work within approximately 10°, but accuracy drops beyond that.
+- **Scans and photos:** Scanned copies and photos taken directly (e.g. a phone camera shot of a printed or handwritten log) are both supported. Keep the page flat and roughly square-on; heavily tilted or skewed captures reduce accuracy.
 - **Watermarks:** PDFs with heavy watermarks, especially tilted ones, will reduce accuracy — particularly for strength and test data extraction. Upload a clean copy where possible.
-- **Handwriting:** Clear handwriting is supported. Extremely unclear handwriting may affect results.
+- **Handwriting:** Handwritten logs are supported. Extremely unclear handwriting may still affect results.
 - **File size:** Maximum 20 MB per file.
 
 ## Credits

@@ -30,7 +30,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from boreholeai._merge._ags import merge_ags_files
+from boreholeai._merge._ags import AgsMergeConflict, merge_ags_files
 from boreholeai._merge._excel import merge_excel_files
 from boreholeai._merge._json import merge_json_files
 
@@ -244,12 +244,22 @@ def merge_results(
 
     if ags_paths:
         out = output_dir / "Borehole_ags4_merged.ags"
-        out.write_text(merge_ags_files(ags_paths), encoding="utf-8")
-        result.files.append(out)
-        logger.info(
-            "merged AGS from %d file(s) → %s",
-            len(ags_paths), out,
-        )
+        try:
+            merged_ags = merge_ags_files(ags_paths)
+        except AgsMergeConflict as exc:
+            # A prior run must not leave a stale merged AGS beside the conflict report.
+            out.unlink(missing_ok=True)
+            result.warnings.append(f"{exc}. No merged AGS produced; originals retained in original_ags/.")
+            original_dir = output_dir / "original_ags"
+            original_dir.mkdir(parents=True, exist_ok=True)
+            for index, source in enumerate(ags_paths, 1):
+                destination = original_dir / f"{index}_{source.name}"
+                shutil.copy2(source, destination)
+                result.files.append(destination)
+        else:
+            out.write_text(merged_ags, encoding="utf-8")
+            result.files.append(out)
+            logger.info("merged AGS from %d file(s) → %s", len(ags_paths), out)
 
     if json_paths:
         out = output_dir / "Borehole_data_merged.json"
