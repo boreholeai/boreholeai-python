@@ -579,6 +579,10 @@ def _validate_strength_links(groups: dict[str, AgsGroup]) -> None:
         "SAMP": sample_key,
         "RPLT": sample_key + ["SPEC_REF", "SPEC_DPTH"],
         "RUCS": sample_key + ["SPEC_REF", "SPEC_DPTH"],
+        "LLPL": sample_key + ["SPEC_REF", "SPEC_DPTH"],
+        "LEMC": sample_key + ["SPEC_REF", "SPEC_DPTH"],
+        "LNMC": sample_key + ["SPEC_REF", "SPEC_DPTH"],
+        "RWCO": sample_key + ["SPEC_REF", "SPEC_DPTH"],
         "IPEN": ["LOCA_ID", "IPEN_DPTH", "IPEN_TESN"],
         "IVAN": ["LOCA_ID", "IVAN_DPTH", "IVAN_TESN"],
     }
@@ -593,7 +597,7 @@ def _validate_strength_links(groups: dict[str, AgsGroup]) -> None:
                 raise AgsMergeConflict(f"AGS {name}: duplicate test/sample key {key}; report revisions require reconciliation; retain original files")
             seen.add(key)
     samples = groups.get("SAMP")
-    for name in ("RPLT", "RUCS"):
+    for name in ("RPLT", "RUCS", "LLPL", "LEMC", "LNMC", "RWCO"):
         group = groups.get(name)
         if group is None or not all(h in group.headings for h in sample_key):
             continue

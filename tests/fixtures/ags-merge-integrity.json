@@ -158,5 +158,89 @@
       "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\n\"GROUP\",\"RUCS\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RUCS_UCS\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.45\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.24\"\n"
     ],
     "error": "duplicate test/sample key"
+  },
+  {
+    "name": "llpl_distinct_sample_ids_same_specimen_ref",
+    "inputs": [
+      "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\"\n\n\"GROUP\",\"LLPL\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"LLPL_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.45\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\",\"R1\",\"2.00\",\"0.24\"\n"
+    ],
+    "expected": "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\"\n\n\"GROUP\",\"LLPL\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"LLPL_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.45\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\",\"R1\",\"2.00\",\"0.24\"\n"
+  },
+  {
+    "name": "llpl_mismatched_sample_id_parent",
+    "inputs": [
+      "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\n\"GROUP\",\"LLPL\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"LLPL_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\",\"R1\",\"2.00\",\"0.45\"\n"
+    ],
+    "error": "missing parent sample"
+  },
+  {
+    "name": "llpl_duplicate_complete_key",
+    "inputs": [
+      "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\n\"GROUP\",\"LLPL\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"LLPL_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.45\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.24\"\n"
+    ],
+    "error": "duplicate test/sample key"
+  },
+  {
+    "name": "lemc_distinct_sample_ids_same_specimen_ref",
+    "inputs": [
+      "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\"\n\n\"GROUP\",\"LEMC\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"LEMC_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.45\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\",\"R1\",\"2.00\",\"0.24\"\n"
+    ],
+    "expected": "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\"\n\n\"GROUP\",\"LEMC\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"LEMC_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.45\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\",\"R1\",\"2.00\",\"0.24\"\n"
+  },
+  {
+    "name": "lemc_mismatched_sample_id_parent",
+    "inputs": [
+      "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\n\"GROUP\",\"LEMC\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"LEMC_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\",\"R1\",\"2.00\",\"0.45\"\n"
+    ],
+    "error": "missing parent sample"
+  },
+  {
+    "name": "lemc_duplicate_complete_key",
+    "inputs": [
+      "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\n\"GROUP\",\"LEMC\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"LEMC_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.45\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.24\"\n"
+    ],
+    "error": "duplicate test/sample key"
+  },
+  {
+    "name": "lnmc_distinct_sample_ids_same_specimen_ref",
+    "inputs": [
+      "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\"\n\n\"GROUP\",\"LNMC\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"LNMC_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.45\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\",\"R1\",\"2.00\",\"0.24\"\n"
+    ],
+    "expected": "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\"\n\n\"GROUP\",\"LNMC\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"LNMC_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.45\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\",\"R1\",\"2.00\",\"0.24\"\n"
+  },
+  {
+    "name": "lnmc_mismatched_sample_id_parent",
+    "inputs": [
+      "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\n\"GROUP\",\"LNMC\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"LNMC_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\",\"R1\",\"2.00\",\"0.45\"\n"
+    ],
+    "error": "missing parent sample"
+  },
+  {
+    "name": "lnmc_duplicate_complete_key",
+    "inputs": [
+      "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\n\"GROUP\",\"LNMC\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"LNMC_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.45\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.24\"\n"
+    ],
+    "error": "duplicate test/sample key"
+  },
+  {
+    "name": "rwco_distinct_sample_ids_same_specimen_ref",
+    "inputs": [
+      "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\"\n\n\"GROUP\",\"RWCO\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RWCO_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.45\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\",\"R1\",\"2.00\",\"0.24\"\n"
+    ],
+    "expected": "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\"\n\n\"GROUP\",\"RWCO\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RWCO_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.45\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\",\"R1\",\"2.00\",\"0.24\"\n"
+  },
+  {
+    "name": "rwco_mismatched_sample_id_parent",
+    "inputs": [
+      "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\n\"GROUP\",\"RWCO\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RWCO_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-B\",\"R1\",\"2.00\",\"0.45\"\n"
+    ],
+    "error": "missing parent sample"
+  },
+  {
+    "name": "rwco_duplicate_complete_key",
+    "inputs": [
+      "\"GROUP\",\"SAMP\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\"\n\n\"GROUP\",\"RWCO\"\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\",\"SPEC_REF\",\"SPEC_DPTH\",\"RWCO_REM\"\n\"UNIT\",\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\",\"X\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.45\"\n\"DATA\",\"BH1\",\"2.00\",\"S1\",\"\",\"ID-A\",\"R1\",\"2.00\",\"0.24\"\n"
+    ],
+    "error": "duplicate test/sample key"
   }
 ]
