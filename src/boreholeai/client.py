@@ -269,12 +269,18 @@ class BoreholeAI:
             for name in batch.successes
             if name in batch.job_ids and batch.workdir is not None
         }
+        dir_job_ids = {
+            _job_workdir(batch.workdir, name, batch.job_ids[name]): batch.job_ids[name]
+            for name in batch.successes
+            if name in batch.job_ids and batch.workdir is not None
+        }
 
         merged_files: list[FileResult] = []
         if success_dirs:
             mr = merge_results(
                 success_dirs, output_dir,
-                dir_labels=dir_labels, macro_button=macro_button,
+                dir_labels=dir_labels, dir_job_ids=dir_job_ids,
+                macro_button=macro_button,
             )
             merged_files = [FileResult(filename=p.name, path=p) for p in mr.files]
             if mr.warnings:

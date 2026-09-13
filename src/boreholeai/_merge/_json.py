@@ -18,6 +18,7 @@ import logging
 from pathlib import Path
 from typing import Iterable, Mapping
 
+from ._ags import AgsSource
 from ._processing_info import aggregate_processing_info
 
 logger = logging.getLogger(__name__)
@@ -35,8 +36,12 @@ _DROPPED_TEST_DATA_FIELD = "page"
 def merge_json_files(
     paths: Iterable[Path],
     source_files: Mapping[Path, str] | None = None,
+    *, ags_sources: Mapping[Path, AgsSource] | None = None,
 ) -> str:
     """Merge Borehole_data.json files into one JSON string (indent=2).
+
+    Optional ags_sources identifies reconciliation destinations as source-AGS
+    keys; regular records and the original destination keys are unchanged.
 
     An unparseable per-job file is skipped (logged) so the merge still
     produces output for the remaining jobs — mirrors the TS
@@ -48,12 +53,16 @@ def merge_json_files(
         Path(path).resolve(): stem
         for path, stem in (source_files or {}).items()
     }
+    resolved_ags_sources = {
+        Path(path).resolve(): source for path, source in (ags_sources or {}).items()
+    }
     # group -> list of per-file metric→value dicts. processing_info is a summary,
     # so it is aggregated the same clean way as the Excel merge after all files
     # are read — not naively concatenated like the record sections.
     pi_infos: dict[str, list[dict[str, str]]] = {}
     for path in paths:
         source_file = resolved_source_files.get(Path(path).resolve())
+        ags_source = resolved_ags_sources.get(Path(path).resolve())
         try:
             doc = json.loads(Path(path).read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
@@ -88,6 +97,14 @@ def merge_json_files(
                         if isinstance(record, dict) else record
                         for record in rows
                     ]
+                    if group == "ags_export" and key == "reconciliation" and ags_source is not None:
+                        rows = [
+                            {**record, "destination_scope": "source_ags",
+                             "source_document": ags_source.source_file,
+                             "source_job_id": ags_source.job_id}
+                            if isinstance(record, dict) else record
+                            for record in rows
+                        ]
                     dest.setdefault(key, []).extend(rows)
 
     # Aggregate processing_info per group, mirroring the Excel merge. The
