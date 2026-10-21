@@ -146,7 +146,6 @@ def _ordinal_key(value: str) -> bytes:
 def _preflight_sources(all_files: list[list[AgsGroup]]) -> None:
     """Check every original input before any duplicate dataset is suppressed."""
     schemas: dict[str, AgsGroup] = {}
-    projects: set[str] = set()
     ags_versions: set[str] = set()
     link_settings: set[tuple[str, str]] = set()
     for groups in all_files:
@@ -168,17 +167,12 @@ def _preflight_sources(all_files: list[list[AgsGroup]]) -> None:
         _validate_strength_links(by_name)
         _validate_location_links(by_name)
         link_settings.add(_record_link_settings(groups))
-        for group_name, heading, identities in (
-            ("PROJ", "PROJ_ID", projects), ("TRAN", "TRAN_AGS", ags_versions)
-        ):
-            group = by_name.get(group_name)
-            if group is None or heading not in group.headings or not group.data:
-                identities.add("")
-            else:
-                idx = group.headings.index(heading)
-                identities.update(row[idx] if idx < len(row) else "" for row in group.data)
-    if len(projects) > 1:
-        raise AgsMergeConflict("AGS PROJ_ID: different declared projects; retain original files")
+        tran = by_name.get("TRAN")
+        if tran is None or "TRAN_AGS" not in tran.headings or not tran.data:
+            ags_versions.add("")
+        else:
+            idx = tran.headings.index("TRAN_AGS")
+            ags_versions.update(row[idx] if idx < len(row) else "" for row in tran.data)
     if len(ags_versions) > 1:
         raise AgsMergeConflict("AGS TRAN_AGS: incompatible dictionary versions; retain original files")
     if len(link_settings) > 1:
@@ -315,18 +309,22 @@ def _append_remark(group: AgsGroup, row: list[str], remark_idx: int, remark: str
 
 
 def _merge_singletons(all_files: list[list[AgsGroup]], sources: list[AgsSource], merged: dict[str, AgsGroup]) -> None:
-    """PROJ and TRAN come from one deterministic source (smallest source pair), so the
-    output does not depend on selection order. Differing PROJ values are recorded in
-    PROJ_MEMO with their sources rather than chosen silently."""
+    """PROJ and TRAN come from one deterministic source (smallest source pair, then group
+    content for sources that share an identity), so the output does not depend on selection order. Differing PROJ values are recorded in
+    PROJ_MEMO with their sources rather than chosen silently. A blank PROJ_ID means the
+    log stated no project number, so it never supplies PROJ and is not a difference."""
     def pair_key(idx: int) -> bytes:
         return _ordinal_key(_canonical_json([sources[idx].source_file, sources[idx].job_id]))
 
     for name in SINGLETON_GROUPS:
         owners = [(idx, group) for idx, groups in enumerate(all_files) for group in groups if group.name == name]
-        owners.sort(key=lambda owner: pair_key(owner[0]))
+        owners.sort(key=lambda owner: (
+            pair_key(owner[0]), _ordinal_key(_canonical_json([owner[1].headings, owner[1].data])),
+        ))
         if not owners:
             continue
-        representative = owners[0][1]
+        stated = next((group for _, group in owners if _project_id(group)), None) if name == "PROJ" else None
+        representative = stated or owners[0][1]
         clone = AgsGroup(
             name, list(representative.headings), list(representative.unit), list(representative.type),
             [list(row) for row in representative.data],
@@ -336,13 +334,13 @@ def _merge_singletons(all_files: list[list[AgsGroup]], sources: list[AgsSource],
             continue
         notes: list[str] = []
         for heading in sorted({h for _, group in owners for h in group.headings}, key=_ordinal_key):
-            if heading == "PROJ_ID":
-                continue
             values = []
             for idx, group in owners:
                 column = group.headings.index(heading) if heading in group.headings else -1
                 row = group.data[0] if group.data else []
                 values.append([row[column] if 0 <= column < len(row) else "", sources[idx].source_file, sources[idx].job_id])
+            if heading == "PROJ_ID":
+                values = [value for value in values if value[0]]
             if len({value[0] for value in values}) > 1:
                 values.sort(key=lambda value: _ordinal_key(_canonical_json(value)))
                 notes.append(f"{heading} differs: " + json.dumps(values, ensure_ascii=True, separators=(",", ":")))
@@ -350,6 +348,14 @@ def _merge_singletons(all_files: list[list[AgsGroup]], sources: list[AgsSource],
             # Resolve the column first: inserting it may replace short rows with padded copies.
             memo_idx = _ensure_remark_heading(clone)
             _append_remark(clone, clone.data[0], memo_idx, "AGS source variants; " + "; ".join(notes))
+
+
+def _project_id(group: AgsGroup) -> str:
+    if "PROJ_ID" not in group.headings or not group.data:
+        return ""
+    column = group.headings.index("PROJ_ID")
+    row = group.data[0]
+    return row[column] if column < len(row) else ""
 
 
 def _preserve_source_variants(all_files: list[list[AgsGroup]], sources: list[AgsSource]) -> list[dict]:

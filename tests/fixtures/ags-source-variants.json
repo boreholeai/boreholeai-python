@@ -342,7 +342,113 @@
         "job_id": "job-b"
       }
     ],
-    "error": "PROJ_ID"
+    "counts": {
+      "LOCA": 1,
+      "GEOL": 1,
+      "SAMP": 1,
+      "RPLT": 1
+    },
+    "ids": [
+      "BH1"
+    ],
+    "proj": {
+      "PROJ_ID": "P1",
+      "PROJ_MEMO": "AGS source variants; PROJ_ID differs: [[\"P1\",\"Report2024.pdf\",\"job-a\"],[\"P2\",\"Report2025.pdf\",\"job-b\"]]"
+    }
+  },
+  {
+    "name": "blank_project_id",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_MEMO\",\"FILE_FSET\"\n\"UNIT\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"X\",\"X\",\"X\"\n\"DATA\",\"\",\"Highway Upgrade\",\"\",\"\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Clay\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_MEMO\",\"FILE_FSET\"\n\"UNIT\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"X\",\"X\",\"X\"\n\"DATA\",\"P1\",\"Highway Upgrade\",\"\",\"\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH2\",\"10.00\",\"\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH2\",\"0.00\",\"20.00\",\"Clay\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-b"
+      }
+    ],
+    "counts": {
+      "LOCA": 2,
+      "GEOL": 2
+    },
+    "ids": [
+      "BH1",
+      "BH2"
+    ],
+    "proj": {
+      "PROJ_ID": "P1",
+      "PROJ_NAME": "Highway Upgrade",
+      "PROJ_MEMO": ""
+    }
+  },
+  {
+    "name": "blank_and_different_project_ids",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_MEMO\",\"FILE_FSET\"\n\"UNIT\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"X\",\"X\",\"X\"\n\"DATA\",\"\",\"Highway Upgrade\",\"\",\"\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Clay\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_MEMO\",\"FILE_FSET\"\n\"UNIT\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"X\",\"X\",\"X\"\n\"DATA\",\"P2\",\"Highway Upgrade\",\"\",\"\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH2\",\"10.00\",\"\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH2\",\"0.00\",\"20.00\",\"Clay\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_MEMO\",\"FILE_FSET\"\n\"UNIT\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"X\",\"X\",\"X\"\n\"DATA\",\"P1\",\"Highway Upgrade\",\"\",\"\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH3\",\"10.00\",\"\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH3\",\"0.00\",\"20.00\",\"Clay\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report2023.pdf",
+        "job_id": "job-a"
+      },
+      {
+        "source_file": "Report2024.pdf",
+        "job_id": "job-b"
+      },
+      {
+        "source_file": "Report2025.pdf",
+        "job_id": "job-c"
+      }
+    ],
+    "counts": {
+      "LOCA": 3,
+      "GEOL": 3
+    },
+    "ids": [
+      "BH1",
+      "BH2",
+      "BH3"
+    ],
+    "proj": {
+      "PROJ_ID": "P2",
+      "PROJ_MEMO": "AGS source variants; PROJ_ID differs: [[\"P1\",\"Report2025.pdf\",\"job-c\"],[\"P2\",\"Report2024.pdf\",\"job-b\"]]"
+    }
+  },
+  {
+    "name": "different_projects_same_source_identity",
+    "inputs": [
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_MEMO\",\"FILE_FSET\"\n\"UNIT\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"X\",\"X\",\"X\"\n\"DATA\",\"P2\",\"Highway Upgrade\",\"\",\"\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH2\",\"10.00\",\"\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH2\",\"0.00\",\"20.00\",\"Clay\"\n",
+      "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\",\"PROJ_MEMO\",\"FILE_FSET\"\n\"UNIT\",\"\",\"\",\"\",\"\"\n\"TYPE\",\"ID\",\"X\",\"X\",\"X\"\n\"DATA\",\"P1\",\"Highway Upgrade\",\"\",\"\"\n\n\"GROUP\",\"TRAN\"\n\"HEADING\",\"TRAN_AGS\",\"TRAN_DLIM\",\"TRAN_RCON\"\n\"UNIT\",\"\",\"\",\"\"\n\"TYPE\",\"X\",\"X\",\"X\"\n\"DATA\",\"4.1.1 AU 1.2\",\"|\",\"+\"\n\n\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_REM\",\"LOCA_FDEP\"\n\"UNIT\",\"\",\"m\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\",\"X\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\",\"\",\"20.00\"\n\n\"GROUP\",\"GEOL\"\n\"HEADING\",\"LOCA_ID\",\"GEOL_TOP\",\"GEOL_BASE\",\"GEOL_DESC\"\n\"UNIT\",\"\",\"m\",\"m\",\"\"\n\"TYPE\",\"ID\",\"2DP\",\"2DP\",\"X\"\n\"DATA\",\"BH1\",\"0.00\",\"20.00\",\"Clay\"\n"
+    ],
+    "sources": [
+      {
+        "source_file": "Report.pdf",
+        "job_id": ""
+      },
+      {
+        "source_file": "Report.pdf",
+        "job_id": ""
+      }
+    ],
+    "counts": {
+      "LOCA": 2,
+      "GEOL": 2
+    },
+    "ids": [
+      "BH1",
+      "BH2"
+    ],
+    "proj": {
+      "PROJ_ID": "P1",
+      "PROJ_MEMO": "AGS source variants; PROJ_ID differs: [[\"P1\",\"Report.pdf\",\"\"],[\"P2\",\"Report.pdf\",\"\"]]"
+    }
   },
   {
     "name": "different_link_delimiters",
